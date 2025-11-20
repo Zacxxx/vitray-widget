@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=Vitray Widget
+Comment=Glassmorphic System Monitor & Terminal
+Exec=/usr/bin/vitray-widget
+Terminal=false
+Type=Application
+Categories=System;Monitor;Utility;
+Keywords=system;monitor;glass;widget;vitray;
+StartupNotify=false

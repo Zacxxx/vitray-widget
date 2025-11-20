@@ -1,0 +1,114 @@
+   Compiling glass-widget v0.1.0 (/home/moebius/Desktop/Dev/glass-widget)
+warning: unused import: `Networks`
+ --> src/monitor.rs:1:15
+  |
+1 | use sysinfo::{Networks, System};
+  |               ^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: unused imports: `PtyFlags` and `TerminalExt`
+ --> src/terminal.rs:2:22
+  |
+2 | use vte4::{Terminal, TerminalExt, TerminalExtManual, PtyFlags};
+  |                      ^^^^^^^^^^^                     ^^^^^^^^
+
+warning: unused import: `std::path::Path`
+ --> src/terminal.rs:4:5
+  |
+4 | use std::path::Path;
+  |     ^^^^^^^^^^^^^^^
+
+warning: unused import: `StyleContext`
+ --> src/ui.rs:2:95
+  |
+2 | use gtk4::{Application, ApplicationWindow, Box, Label, Orientation, ProgressBar, CssProvider, StyleContext};
+  |                                                                                               ^^^^^^^^^^^^
+
+error[E0599]: no method named `refresh_networks` found for struct `sysinfo::System` in the current scope
+  --> src/monitor.rs:22:18
+   |
+22 |         self.sys.refresh_networks();
+   |                  ^^^^^^^^^^^^^^^^
+   |
+help: there is a method `refresh_memory` with a similar name
+   |
+22 -         self.sys.refresh_networks();
+22 +         self.sys.refresh_memory();
+   |
+
+error[E0599]: no method named `networks` found for struct `sysinfo::System` in the current scope
+  --> src/monitor.rs:36:49
+   |
+36 |         for (_interface_name, data) in self.sys.networks() {
+   |                                                 ^^^^^^^^ method not found in `sysinfo::System`
+
+error[E0277]: expected a `Fn()` closure, found `std::option::Option<_>`
+  --> src/terminal.rs:27:9
+   |
+21 |     terminal.spawn_async(
+   |              ----------- required by a bound introduced by this call
+...
+27 |         None, // child setup
+   |         ^^^^ expected an `Fn()` closure, found `std::option::Option<_>`
+   |
+   = help: the trait `Fn()` is not implemented for `std::option::Option<_>`
+   = note: wrap the `std::option::Option<_>` in a closure with no arguments: `|| { /* code */ }`
+note: required by a bound in `vte4::TerminalExtManual::spawn_async`
+  --> /home/moebius/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/vte4-0.9.0/src/terminal.rs:42:76
+   |
+42 |     fn spawn_async<P: FnOnce(Result<glib::Pid, glib::Error>) + 'static, Q: Fn() + 'static>(
+   |                                                                            ^^^^ required by this bound in `TerminalExtManual::spawn_async`
+
+error[E0308]: mismatched types
+   --> src/terminal.rs:26:9
+    |
+ 21 |     terminal.spawn_async(
+    |              ----------- arguments to this method are incorrect
+...
+ 26 |         SpawnFlags::DEFAULT,
+    |         ^^^^^^^^^^^^^^^^^^^ expected `gtk4::glib::SpawnFlags`, found `glib::SpawnFlags`
+    |
+note: two different versions of crate `glib` are being used; two types coming from two different versions of the same crate are different types even if they look the same
+    |
+   ::: src/main.rs:1:5
+    |
+  1 |   use gtk4::prelude::*;
+    |       ---- one version of crate `glib` used here, as a dependency of crate `cairo`
+    |
+   ::: src/terminal.rs:3:5
+    |
+  3 |   use glib::SpawnFlags;
+    |       ---- one version of crate `glib` used here, as a direct dependency of the current crate
+   --> /home/moebius/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/glib-0.21.4/src/auto/flags.rs:489:1
+    |
+526 |   }
+    |   ^ this is the expected type `gtk4::glib::SpawnFlags`
+    |
+   ::: /home/moebius/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/glib-0.20.12/src/auto/flags.rs:489:1
+    |
+489 | / bitflags! {
+490 | |     #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+491 | |     #[doc(alias = "GSpawnFlags")]
+492 | |     pub struct SpawnFlags: u32 {
+...   |
+526 | | }
+    | |_^ this is the found type `glib::SpawnFlags`
+    = help: you can use `cargo tree` to explore your dependency tree
+note: method defined here
+   --> /home/moebius/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/vte4-0.9.0/src/terminal.rs:42:8
+    |
+ 42 |     fn spawn_async<P: FnOnce(Result<glib::Pid, glib::Error>) + 'static, Q: Fn() + 'static>(
+    |        ^^^^^^^^^^^
+    = note: this error originates in the macro `$crate::__declare_public_bitflags` which comes from the expansion of the macro `bitflags` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning: unused import: `gtk4::prelude`
+ --> src/terminal.rs:1:5
+  |
+1 | use gtk4::prelude::*;
+  |     ^^^^^^^^^^^^^
+
+Some errors have detailed explanations: E0277, E0308, E0599.
+For more information about an error, try `rustc --explain E0277`.
+warning: `glass-widget` (bin "glass-widget") generated 5 warnings
+error: could not compile `glass-widget` (bin "glass-widget") due to 4 previous errors; 5 warnings emitted

@@ -1,0 +1,247 @@
+   Compiling glass-widget v0.1.0 (/home/moebius/Desktop/Dev/glass-widget)
+error[E0432]: unresolved imports `sysinfo::CpuExt`, `sysinfo::NetworkExt`, `sysinfo::SystemExt`
+ --> src/monitor.rs:1:15
+  |
+1 | use sysinfo::{CpuExt, NetworkExt, System, SystemExt};
+  |               ^^^^^^  ^^^^^^^^^^          ^^^^^^^^^ no `SystemExt` in the root
+  |               |       |
+  |               |       no `NetworkExt` in the root
+  |               no `CpuExt` in the root
+  |
+help: a similar name exists in the module
+  |
+1 - use sysinfo::{CpuExt, NetworkExt, System, SystemExt};
+1 + use sysinfo::{CpuExt, NetworkData, System, SystemExt};
+  |
+help: a similar name exists in the module
+  |
+1 - use sysinfo::{CpuExt, NetworkExt, System, SystemExt};
+1 + use sysinfo::{CpuExt, NetworkExt, System, System};
+  |
+
+error[E0433]: failed to resolve: could not find `SpawnFlags` in `vte`
+  --> src/terminal.rs:25:14
+   |
+25 |         vte::SpawnFlags::DEFAULT,
+   |              ^^^^^^^^^^ could not find `SpawnFlags` in `vte`
+   |
+help: consider importing this struct
+   |
+ 1 + use glib::SpawnFlags;
+   |
+help: if you import `SpawnFlags`, refer to it directly
+   |
+25 -         vte::SpawnFlags::DEFAULT,
+25 +         SpawnFlags::DEFAULT,
+   |
+
+error[E0425]: cannot find function, tuple struct or tuple variant `Continue` in crate `glib`
+  --> src/ui.rs:90:15
+   |
+90 |         glib::Continue(true)
+   |               ^^^^^^^^ not found in `glib`
+   |
+help: consider importing one of these items
+   |
+ 1 + use std::ops::ControlFlow::Continue;
+   |
+ 1 + use glib::ControlFlow::Continue;
+   |
+ 1 + use sysinfo::Signal::Continue;
+   |
+help: if you import `Continue`, refer to it directly
+   |
+90 -         glib::Continue(true)
+90 +         Continue(true)
+   |
+
+warning: unused import: `std::cell::RefCell`
+ --> src/monitor.rs:2:5
+  |
+2 | use std::cell::RefCell;
+  |     ^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: unused import: `std::rc::Rc`
+ --> src/monitor.rs:3:5
+  |
+3 | use std::rc::Rc;
+  |     ^^^^^^^^^^^
+
+error[E0599]: no method named `refresh_networks` found for struct `sysinfo::System` in the current scope
+  --> src/monitor.rs:19:18
+   |
+19 |         self.sys.refresh_networks();
+   |                  ^^^^^^^^^^^^^^^^
+   |
+help: there is a method `refresh_memory` with a similar name
+   |
+19 -         self.sys.refresh_networks();
+19 +         self.sys.refresh_memory();
+   |
+
+error[E0599]: no method named `networks` found for struct `sysinfo::System` in the current scope
+  --> src/monitor.rs:33:49
+   |
+33 |         for (_interface_name, data) in self.sys.networks() {
+   |                                                 ^^^^^^^^ method not found in `sysinfo::System`
+
+error[E0308]: mismatched types
+   --> src/terminal.rs:23:9
+    |
+ 20 |     terminal.spawn_sync(
+    |              ---------- arguments to this method are incorrect
+...
+ 23 |         &command,
+    |         ^^^^^^^^ expected `&[&Path]`, found `&[&str; 1]`
+    |
+    = note: expected reference `&[&std::path::Path]`
+               found reference `&[&str; 1]`
+note: method defined here
+   --> /home/moebius/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/vte-rs-0.4.0/src/auto/terminal.rs:322:8
+    |
+322 |     fn spawn_sync<P: IsA<gio::Cancellable>>(&self, pty_flags: PtyFlags, working_directory: Option<&str>, argv: &[&std::path::Path], envv:...
+    |        ^^^^^^^^^^
+
+error[E0034]: multiple applicable items in scope
+  --> src/ui.rs:29:34
+   |
+29 |     if let Some(screen) = window.screen() {
+   |                                  ^^^^^^ multiple `screen` found
+   |
+   = note: candidate #1 is defined in an impl of the trait `gtk::prelude::GtkWindowExt` for the type `O`
+   = note: candidate #2 is defined in an impl of the trait `gtk::prelude::WidgetExt` for the type `O`
+help: disambiguate the method for candidate #1
+   |
+29 -     if let Some(screen) = window.screen() {
+29 +     if let Some(screen) = gtk::prelude::GtkWindowExt::screen(&window) {
+   |
+help: disambiguate the method for candidate #2
+   |
+29 -     if let Some(screen) = window.screen() {
+29 +     if let Some(screen) = gtk::prelude::WidgetExt::screen(&window) {
+   |
+
+error[E0599]: no method named `add_css_class` found for struct `gtk::Box` in the current scope
+  --> src/ui.rs:36:14
+   |
+36 |     main_box.add_css_class("glass-panel"); // GTK4 style, for GTK3 use get_style_context().add_class
+   |              ^^^^^^^^^^^^^ method not found in `gtk::Box`
+
+error[E0599]: no method named `get_style_context` found for struct `gtk::Box` in the current scope
+  --> src/ui.rs:37:14
+   |
+37 |     main_box.get_style_context().add_class("glass-panel");
+   |              ^^^^^^^^^^^^^^^^^
+   |
+help: there is a method `style_context` with a similar name
+   |
+37 -     main_box.get_style_context().add_class("glass-panel");
+37 +     main_box.style_context().add_class("glass-panel");
+   |
+
+error[E0599]: no method named `get_style_context` found for struct `gtk::Label` in the current scope
+  --> src/ui.rs:41:15
+   |
+41 |     cpu_label.get_style_context().add_class("monitor-label");
+   |               ^^^^^^^^^^^^^^^^^
+   |
+help: there is a method `style_context` with a similar name
+   |
+41 -     cpu_label.get_style_context().add_class("monitor-label");
+41 +     cpu_label.style_context().add_class("monitor-label");
+   |
+
+error[E0599]: no method named `get_style_context` found for struct `gtk::Label` in the current scope
+  --> src/ui.rs:45:15
+   |
+45 |     ram_label.get_style_context().add_class("monitor-label");
+   |               ^^^^^^^^^^^^^^^^^
+   |
+help: there is a method `style_context` with a similar name
+   |
+45 -     ram_label.get_style_context().add_class("monitor-label");
+45 +     ram_label.style_context().add_class("monitor-label");
+   |
+
+error[E0599]: no method named `get_style_context` found for struct `gtk::Label` in the current scope
+  --> src/ui.rs:49:15
+   |
+49 |     net_label.get_style_context().add_class("monitor-label");
+   |               ^^^^^^^^^^^^^^^^^
+   |
+help: there is a method `style_context` with a similar name
+   |
+49 -     net_label.get_style_context().add_class("monitor-label");
+49 +     net_label.style_context().add_class("monitor-label");
+   |
+
+error[E0599]: no method named `get_style_context` found for struct `gtk::Box` in the current scope
+  --> src/ui.rs:60:14
+   |
+60 |     term_box.get_style_context().add_class("terminal-container");
+   |              ^^^^^^^^^^^^^^^^^
+   |
+help: there is a method `style_context` with a similar name
+   |
+60 -     term_box.get_style_context().add_class("terminal-container");
+60 +     term_box.style_context().add_class("terminal-container");
+   |
+
+error[E0277]: the trait bound `vte::Terminal: IsA<gtk::Widget>` is not satisfied
+   --> src/ui.rs:61:25
+    |
+ 61 |     term_box.pack_start(&terminal, true, true, 0);
+    |              ---------- ^^^^^^^^^ the trait `IsA<gtk::Widget>` is not implemented for `vte::Terminal`
+    |              |
+    |              required by a bound introduced by this call
+    |
+note: there are multiple different versions of crate `glib` in the dependency graph
+    |
+   ::: src/ui.rs:90:9
+    |
+ 90 |           glib::Continue(true)
+    |           ---- one version of crate `glib` used here, as a direct dependency of the current crate
+    |
+   ::: src/terminal.rs:2:5
+    |
+  2 |   use vte::{Terminal, TerminalExt};
+    |       --- one version of crate `glib` used here, as a dependency of crate `gdk_pixbuf`
+    |
+   ::: /home/moebius/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/glib-0.9.3/src/clone.rs:5:1
+    |
+  5 |   pub trait Downgrade
+    |   ------------------- this is the found trait
+    |
+   ::: /home/moebius/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/vte-rs-0.4.0/src/auto/terminal.rs:40:1
+    |
+ 40 | / glib_wrapper! {
+ 41 | |     pub struct Terminal(Object<vte_sys::VteTerminal, vte_sys::VteTerminalClass, TerminalClass>) @extends gtk::Widget;
+ 42 | |
+ 43 | |     match fn {
+...   |
+ 46 | | }
+    | |_- this type doesn't implement the required trait
+   --> /home/moebius/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/glib-0.18.5/src/object.rs:65:1
+    |
+ 65 | / pub unsafe trait IsA<T: ObjectType>:
+ 66 | |     ObjectType + Into<T> + AsRef<T> + std::borrow::Borrow<T>
+    | |____________________________________________________________^ this is the required trait
+    = help: you can use `cargo tree` to explore your dependency tree
+note: required by a bound in `gtk::prelude::BoxExt::pack_start`
+   --> /home/moebius/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/gtk-0.18.2/src/auto/box_.rs:365:39
+    |
+365 |     fn pack_start(&self, child: &impl IsA<Widget>, expand: bool, fill: bool, padding: u32) {
+    |                                       ^^^^^^^^^^^ required by this bound in `BoxExt::pack_start`
+
+warning: unused import: `gtk::prelude`
+ --> src/terminal.rs:1:5
+  |
+1 | use gtk::prelude::*;
+  |     ^^^^^^^^^^^^
+
+Some errors have detailed explanations: E0034, E0277, E0308, E0425, E0432, E0433, E0599.
+For more information about an error, try `rustc --explain E0034`.
+warning: `glass-widget` (bin "glass-widget") generated 3 warnings
+error: could not compile `glass-widget` (bin "glass-widget") due to 14 previous errors; 3 warnings emitted
