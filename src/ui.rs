@@ -1,18 +1,263 @@
+use gtk4::gdk::prelude::*;
 use gtk4::prelude::*;
 use gtk4::{
-    Application, ApplicationWindow, Box, Label, Orientation, CssProvider, 
-    Grid, Notebook, GestureClick, glib
+    gdk, glib, Align, Application, ApplicationWindow, Box, Button, CssProvider, DrawingArea,
+    GestureClick, Grid, Label, LevelBar, Notebook, Orientation, Popover, Separator, Stack,
+    StackTransitionType,
 };
-use crate::monitor::SystemMonitor;
-use crate::terminal::create_terminal;
-use crate::settings::Settings;
-use crate::shortcuts::Shortcuts;
+use std::{cell::RefCell, rc::Rc};
 use vte4::TerminalExt;
-use std::rc::Rc;
-use std::cell::RefCell;
+
+use crate::monitor::SystemMonitor;
+use crate::settings::{MonitorStyle, Settings, Theme};
+use crate::settings_ui::show_settings_window;
+use crate::shortcuts::Shortcuts;
+use crate::shortcuts_ui::ShortcutsPanel;
+use crate::terminal::create_terminal;
+
+#[derive(Clone, Copy)]
+enum Trend {
+    Up,
+    Down,
+    Stable,
+}
+
+#[derive(Clone)]
+struct PerformanceStrip {
+    cpu: Label,
+    gpu: Label,
+    ram: Label,
+    net: Label,
+}
+
+impl PerformanceStrip {
+    fn new() -> Self {
+        let chip = |text: &str| {
+            let lbl = Label::new(Some(text));
+            lbl.add_css_class("perf-chip");
+            lbl
+        };
+
+        Self {
+            cpu: chip("CPU —"),
+            gpu: chip("GPU —"),
+            ram: chip("RAM —"),
+            net: chip("NET —"),
+        }
+    }
+
+    fn widget(&self) -> Box {
+        let row = Box::new(Orientation::Horizontal, 6);
+        row.set_halign(Align::Center);
+        row.add_css_class("perf-ribbon");
+        row.append(&self.cpu);
+        row.append(&self.gpu);
+        row.append(&self.ram);
+        row.append(&self.net);
+        row
+    }
+
+    fn update(&self, cpu: &str, gpu: &str, ram: &str, net: &str) {
+        self.cpu.set_text(cpu);
+        self.gpu.set_text(gpu);
+        self.ram.set_text(ram);
+        self.net.set_text(net);
+    }
+}
+
+#[derive(Clone)]
+struct MonitorCard {
+    container: Box,
+    value_label: Label,
+    bar: LevelBar,
+    chart: DrawingArea,
+    stack: Stack,
+    history: Rc<RefCell<Vec<f64>>>,
+    last_value: Rc<RefCell<f64>>,
+    scale_max: f64,
+}
+
+impl MonitorCard {
+    fn new(title: &str, style: &MonitorStyle, scale_max: f64) -> Self {
+        let container = Box::new(Orientation::Vertical, 4);
+        container.add_css_class("monitor-card");
+
+        let title_label = Label::new(Some(title));
+        title_label.add_css_class("card-title");
+        title_label.set_halign(Align::Start);
+        container.append(&title_label);
+
+        let value_label = Label::new(Some("—"));
+        value_label.add_css_class("card-value");
+        value_label.set_halign(Align::Start);
+        container.append(&value_label);
+
+        let stack = Stack::new();
+        stack.set_transition_type(StackTransitionType::Crossfade);
+        stack.set_vexpand(true);
+        stack.set_hexpand(true);
+
+        let spacer = Box::new(Orientation::Vertical, 0);
+        stack.add_named(&spacer, Some("text"));
+
+        let bar = LevelBar::new();
+        bar.set_min_value(0.0);
+        bar.set_max_value(scale_max);
+        bar.add_css_class("monitor-bar");
+        stack.add_named(&bar, Some("bar"));
+
+        let chart = DrawingArea::new();
+        chart.add_css_class("monitor-chart");
+        stack.add_named(&chart, Some("chart"));
+
+        container.append(&stack);
+
+        let history = Rc::new(RefCell::new(Vec::<f64>::new()));
+        let last_value = Rc::new(RefCell::new(0.0));
+
+        let card = Self {
+            container,
+            value_label,
+            bar,
+            chart,
+            stack,
+            history,
+            last_value,
+            scale_max,
+        };
+        card.set_style(style);
+        card.install_chart_drawer();
+        card
+    }
+
+    fn install_chart_drawer(&self) {
+        let hist = self.history.clone();
+        self.chart.set_draw_func(move |_area, cr, width, height| {
+            let data = hist.borrow();
+            if data.len() < 2 {
+                return;
+            }
+
+            let max = data
+                .iter()
+                .cloned()
+                .fold(1.0_f64, |a, b| if b > a { b } else { a });
+            let step = (width.max(1) - 1) as f64 / (data.len() - 1) as f64;
+
+            cr.set_source_rgba(0.9, 0.95, 1.0, 0.35);
+            cr.set_line_width(2.0);
+
+            for (idx, val) in data.iter().enumerate() {
+                let x = idx as f64 * step;
+                let y = height as f64 - ((val / max) * height as f64 * 0.9);
+                if idx == 0 {
+                    cr.move_to(x, y);
+                } else {
+                    cr.line_to(x, y);
+                }
+            }
+
+            let _ = cr.stroke();
+        });
+    }
+
+    fn set_style(&self, style: &MonitorStyle) {
+        match style {
+            MonitorStyle::Bar => self.stack.set_visible_child_name("bar"),
+            MonitorStyle::Chart => self.stack.set_visible_child_name("chart"),
+            MonitorStyle::Text => self.stack.set_visible_child_name("text"),
+        }
+    }
+
+    fn update(&self, numeric: f64, display: &str, style: &MonitorStyle) {
+        self.set_style(style);
+        self.value_label.set_text(display);
+
+        let mut last = self.last_value.borrow_mut();
+        let trend = if *last == 0.0 {
+            Trend::Stable
+        } else if numeric > *last + 1.0 {
+            Trend::Up
+        } else if numeric + 1.0 < *last {
+            Trend::Down
+        } else {
+            Trend::Stable
+        };
+        *last = numeric;
+
+        self.value_label.remove_css_class("trend-up");
+        self.value_label.remove_css_class("trend-down");
+        self.value_label.remove_css_class("trend-stable");
+        self.value_label.add_css_class(match trend {
+            Trend::Up => "trend-up",
+            Trend::Down => "trend-down",
+            Trend::Stable => "trend-stable",
+        });
+
+        let clamped = numeric.min(self.scale_max);
+        self.bar.set_value(clamped);
+
+        {
+            let mut hist = self.history.borrow_mut();
+            hist.push(clamped);
+            if hist.len() > 80 {
+                hist.remove(0);
+            }
+        }
+        self.chart.queue_draw();
+    }
+
+    fn set_visible(&self, show: bool) {
+        self.container.set_visible(show);
+    }
+}
+
+#[derive(Clone)]
+struct MonitorGroup {
+    cpu: MonitorCard,
+    gpu: MonitorCard,
+    ram: MonitorCard,
+    net: MonitorCard,
+}
+
+impl MonitorGroup {
+    fn set_style(&self, style: &MonitorStyle) {
+        self.cpu.set_style(style);
+        self.gpu.set_style(style);
+        self.ram.set_style(style);
+        self.net.set_style(style);
+    }
+
+    fn set_visibility(&self, settings: &Settings) {
+        self.cpu.set_visible(settings.show_cpu);
+        self.gpu.set_visible(settings.show_gpu);
+        self.ram.set_visible(settings.show_ram);
+        self.net.set_visible(settings.show_network);
+    }
+}
+
+#[derive(Clone)]
+struct UiHandles {
+    window: ApplicationWindow,
+    root: Box,
+    terminal_section: Box,
+    monitoring_section: Box,
+    monitor_cards: MonitorGroup,
+    performance_strip: PerformanceStrip,
+    shortcuts_panel: ShortcutsPanel,
+    notebook: Notebook,
+    settings: Rc<RefCell<Settings>>,
+}
+
+#[derive(Clone)]
+struct HeaderBar {
+    widget: Box,
+    settings_btn: Button,
+    shortcuts_btn: Button,
+}
 
 pub fn build_ui(app: &Application) {
-    let _settings = Settings::load();
+    let settings = Rc::new(RefCell::new(Settings::load()));
     let _shortcuts = Shortcuts::load();
 
     let provider = CssProvider::new();
@@ -21,7 +266,7 @@ pub fn build_ui(app: &Application) {
     } else {
         provider.load_from_path("/usr/share/vitray-widget/style.css");
     }
-    
+
     if let Some(display) = gtk4::gdk::Display::default() {
         gtk4::style_context_add_provider_for_display(
             &display,
@@ -32,150 +277,479 @@ pub fn build_ui(app: &Application) {
 
     let window = ApplicationWindow::new(app);
     window.set_title(Some("Vitray Widget"));
-    window.set_default_size(400, 700);
+    window.set_default_size(520, 760);
     window.set_decorated(false);
-    window.set_css_classes(&["glass-window"]);
+    window.add_css_class("glass-window");
+    window.set_resizable(!settings.borrow().lock_size);
 
-    let main_box = Box::new(Orientation::Vertical, 0);
-    main_box.add_css_class("glass-panel");
+    // --- Terminal channel ---
+    #[allow(deprecated)]
+    let (sender, receiver) = ::glib::MainContext::channel(::glib::Priority::DEFAULT);
 
-    // --- Terminal Section (Top) ---
+    // --- Root layout ---
+    let root = Box::new(Orientation::Horizontal, 10);
+    root.add_css_class("root");
+    root.set_margin_top(10);
+    root.set_margin_bottom(10);
+    root.set_margin_start(10);
+    root.set_margin_end(10);
+
+    let main_column = Box::new(Orientation::Vertical, 12);
+    main_column.add_css_class("glass-panel");
+
+    // --- Header ---
+    let performance_strip = PerformanceStrip::new();
+    let header = build_header(&window, settings.clone());
+    main_column.append(&header.widget);
+    main_column.append(&performance_strip.widget());
+
+    // --- Terminal Section ---
+    let terminal_section = Box::new(Orientation::Vertical, 6);
+    terminal_section.add_css_class("terminal-section");
+
+    let terminal_header = Box::new(Orientation::Horizontal, 8);
+    terminal_header.add_css_class("terminal-header");
+    let tabs_btn = Button::with_label("+ Tab");
+    tabs_btn.add_css_class("pill-btn");
+    let shortcuts_btn = Button::with_label("Shortcuts");
+    shortcuts_btn.add_css_class("pill-btn");
+    terminal_header.append(&Label::new(Some("Terminal")));
+    terminal_header.append(&tabs_btn);
+    terminal_header.append(&shortcuts_btn);
+    terminal_header.set_halign(Align::Start);
+
     let notebook = Notebook::new();
     notebook.set_show_tabs(true);
     notebook.set_scrollable(true);
     notebook.add_css_class("terminal-notebook");
 
-    // Initial Terminal Tab
     let terminal = create_terminal();
     let scrolled = gtk4::ScrolledWindow::new();
     scrolled.set_child(Some(&terminal));
     scrolled.set_vexpand(true);
-    notebook.append_page(&scrolled, Some(&Label::new(Some("Terminal"))));
+    notebook.append_page(&scrolled, Some(&Label::new(Some("T1"))));
 
-    // Add notebook to main box
-    main_box.append(&notebook);
+    terminal_section.append(&terminal_header);
+    terminal_section.append(&notebook);
 
-    // --- Separator ---
-    let separator = gtk4::Separator::new(Orientation::Horizontal);
+    // --- Middle separator ---
+    let separator = Separator::new(Orientation::Horizontal);
     separator.add_css_class("section-separator");
-    main_box.append(&separator);
 
-    // --- Monitoring Grid (Bottom) ---
+    // --- Monitoring ---
+    let monitoring_section = Box::new(Orientation::Vertical, 8);
+    monitoring_section.add_css_class("monitoring-shell");
+    monitoring_section.append(&Label::new(Some("Vitals")));
+
     let grid = Grid::new();
-    grid.set_column_spacing(10);
-    grid.set_row_spacing(10);
-    grid.set_margin_top(10);
-    grid.set_margin_bottom(10);
-    grid.set_margin_start(10);
-    grid.set_margin_end(10);
+    grid.set_column_spacing(12);
+    grid.set_row_spacing(12);
+    grid.set_margin_bottom(6);
+    grid.set_margin_start(4);
+    grid.set_margin_end(4);
     grid.add_css_class("monitoring-grid");
 
-    // CPU Card
-    let cpu_card = Box::new(Orientation::Vertical, 5);
-    cpu_card.add_css_class("monitor-card");
-    let cpu_label = Label::new(Some("CPU"));
-    cpu_label.add_css_class("card-title");
-    let cpu_value = Label::new(Some("0%"));
-    cpu_value.add_css_class("card-value");
-    cpu_card.append(&cpu_label);
-    cpu_card.append(&cpu_value);
-    grid.attach(&cpu_card, 0, 0, 1, 1);
+    let monitor_cards = MonitorGroup {
+        cpu: MonitorCard::new("CPU", &settings.borrow().monitor_style, 100.0),
+        gpu: MonitorCard::new("GPU", &settings.borrow().monitor_style, 100.0),
+        ram: MonitorCard::new("RAM", &settings.borrow().monitor_style, 100.0),
+        net: MonitorCard::new("Network", &settings.borrow().monitor_style, 2000.0),
+    };
 
-    // GPU Card
-    let gpu_card = Box::new(Orientation::Vertical, 5);
-    gpu_card.add_css_class("monitor-card");
-    let gpu_label = Label::new(Some("GPU"));
-    gpu_label.add_css_class("card-title");
-    let gpu_value = Label::new(Some("N/A"));
-    gpu_value.add_css_class("card-value");
-    gpu_card.append(&gpu_label);
-    gpu_card.append(&gpu_value);
-    grid.attach(&gpu_card, 1, 0, 1, 1);
+    grid.attach(&monitor_cards.cpu.container, 0, 0, 1, 1);
+    grid.attach(&monitor_cards.gpu.container, 1, 0, 1, 1);
+    grid.attach(&monitor_cards.ram.container, 0, 1, 1, 1);
+    grid.attach(&monitor_cards.net.container, 1, 1, 1, 1);
+    monitoring_section.append(&grid);
 
-    // RAM Card
-    let ram_card = Box::new(Orientation::Vertical, 5);
-    ram_card.add_css_class("monitor-card");
-    let ram_label = Label::new(Some("RAM"));
-    ram_label.add_css_class("card-title");
-    let ram_value = Label::new(Some("0 GB"));
-    ram_value.add_css_class("card-value");
-    ram_card.append(&ram_label);
-    ram_card.append(&ram_value);
-    grid.attach(&ram_card, 0, 1, 1, 1);
+    main_column.append(&terminal_section);
+    main_column.append(&separator);
+    main_column.append(&monitoring_section);
 
-    // Network Card
-    let net_card = Box::new(Orientation::Vertical, 5);
-    net_card.add_css_class("monitor-card");
-    let net_label = Label::new(Some("NET"));
-    net_label.add_css_class("card-title");
-    let net_value = Label::new(Some("0 KB/s"));
-    net_value.add_css_class("card-value");
-    net_card.append(&net_label);
-    net_card.append(&net_value);
-    grid.attach(&net_card, 1, 1, 1, 1);
+    // --- Shortcuts side panel ---
+    let shortcuts_panel = ShortcutsPanel::new(&window, sender.clone());
+    shortcuts_panel.set_revealed(settings.borrow().show_shortcuts_panel);
 
-    main_box.append(&grid);
+    root.append(&main_column);
+    let gap = Separator::new(Orientation::Vertical);
+    gap.add_css_class("side-gap");
+    root.append(&gap);
+    root.append(&shortcuts_panel.revealer);
 
-    window.set_child(Some(&main_box));
+    window.set_child(Some(&root));
 
-    // --- Shortcuts Channel ---
-    #[allow(deprecated)]
-    let (sender, receiver) = ::glib::MainContext::channel(::glib::Priority::DEFAULT);
-    
-    let terminal_clone = terminal.clone();
+    // Terminal channel feed
     receiver.attach(None, move |cmd: String| {
         let cmd_with_newline = format!("{}\n", cmd);
-        terminal_clone.feed_child(cmd_with_newline.as_bytes());
+        terminal.feed_child(cmd_with_newline.as_bytes());
         ::glib::ControlFlow::Continue
     });
 
-    // --- Context Menu ---
-    let gesture = GestureClick::new();
-    gesture.set_button(3); // Right click
-    let window_clone = window.clone();
-    let sender_clone = sender.clone();
-    
-    gesture.connect_pressed(move |_gesture, _, _, _| {
-        // Simple menu simulation for now since PopoverMenu requires a MenuModel
-        // We'll just toggle the settings window on right click for demonstration
-        // In a real app, we'd build a proper Gio::Menu
-        crate::settings_ui::show_settings_window(&window_clone);
-        crate::shortcuts_ui::show_shortcuts_panel(&window_clone, sender_clone.clone());
-    });
-    window.add_controller(gesture);
+    {
+        let notebook_clone = notebook.clone();
+        tabs_btn.connect_clicked(move |_| add_terminal_tab(&notebook_clone));
+    }
+
+    {
+        let panel_clone = shortcuts_panel.clone();
+        shortcuts_btn.connect_clicked(move |_| panel_clone.toggle());
+    }
+
+    let handles = UiHandles {
+        window: window.clone(),
+        root: root.clone(),
+        terminal_section: terminal_section.clone(),
+        monitoring_section: monitoring_section.clone(),
+        monitor_cards: monitor_cards.clone(),
+        performance_strip: performance_strip.clone(),
+        shortcuts_panel: shortcuts_panel.clone(),
+        notebook: notebook.clone(),
+        settings: settings.clone(),
+    };
+
+    // Context menu / right click
+    build_context_menu(handles.clone());
+
+    {
+        let handles_clone = handles.clone();
+        header.settings_btn.connect_clicked(move |_| {
+            let settings_rc = handles_clone.settings.clone();
+            let handles_apply = handles_clone.clone();
+            show_settings_window(
+                &handles_clone.window,
+                settings_rc,
+                move |updated: Settings| {
+                    handles_apply.settings.replace(updated.clone());
+                    apply_settings(&handles_apply, &updated);
+                },
+            );
+        });
+    }
+
+    {
+        let panel_clone = handles.shortcuts_panel.clone();
+        header
+            .shortcuts_btn
+            .connect_clicked(move |_| panel_clone.toggle());
+    }
+    apply_settings(&handles, &settings.borrow());
 
     window.present();
 
     // --- Update Loop ---
     let monitor = Rc::new(RefCell::new(SystemMonitor::new()));
-    
+    let mut last_net: Option<(u64, u64)> = None;
+
     glib::timeout_add_seconds_local(1, move || {
         let mut mon = monitor.borrow_mut();
         mon.refresh();
-        
-        // CPU
-        let cpu = mon.get_cpu_usage();
-        cpu_value.set_text(&format!("{:.0}%", cpu));
-        // Color logic
-        if cpu > 80.0 { cpu_value.add_css_class("status-critical"); }
-        else if cpu > 50.0 { cpu_value.add_css_class("status-warning"); }
-        else { cpu_value.remove_css_class("status-critical"); cpu_value.remove_css_class("status-warning"); }
+        let active_settings = handles.settings.borrow().clone();
+        let style = active_settings.monitor_style.clone();
 
-        // GPU
-        if let Some(gpu) = mon.get_gpu_usage() {
-            gpu_value.set_text(&format!("{:.0}%", gpu));
+        let cpu = mon.get_cpu_usage() as f64;
+        handles
+            .monitor_cards
+            .cpu
+            .update(cpu, &format!("{cpu:.0}%"), &style);
+
+        let gpu_usage = mon.get_gpu_usage();
+        if let Some(gpu) = gpu_usage {
+            handles
+                .monitor_cards
+                .gpu
+                .update(gpu as f64, &format!("{gpu:.0}%"), &style);
+        } else {
+            handles.monitor_cards.gpu.update(0.0, "N/A", &style);
         }
 
-        // RAM
-        let (used, _total) = mon.get_ram_usage();
+        let (used, total) = mon.get_ram_usage();
         let used_gb = used as f64 / 1024.0 / 1024.0 / 1024.0;
-        ram_value.set_text(&format!("{:.1} GB", used_gb));
+        let total_gb = total as f64 / 1024.0 / 1024.0 / 1024.0;
+        let ram_pct = if total > 0 {
+            used as f64 / total as f64 * 100.0
+        } else {
+            0.0
+        };
+        handles.monitor_cards.ram.update(
+            ram_pct,
+            &format!("{used_gb:.1}/{total_gb:.1} GB"),
+            &style,
+        );
 
-        // Net
-        let (rx, tx) = mon.get_network_stats();
-        let total_speed = (rx + tx) as f64 / 1024.0; // KB/s
-        net_value.set_text(&format!("{:.0} KB/s", total_speed));
+        let (rx_raw, tx_raw) = mon.get_network_stats();
+        let (rx_rate, tx_rate) = if let Some((prev_rx, prev_tx)) = last_net {
+            (
+                rx_raw.saturating_sub(prev_rx),
+                tx_raw.saturating_sub(prev_tx),
+            )
+        } else {
+            (0, 0)
+        };
+        last_net = Some((rx_raw, tx_raw));
+        let total_speed = (rx_rate + tx_rate) as f64 / 1024.0;
+        handles.monitor_cards.net.update(
+            total_speed.min(2000.0),
+            &format!("{total_speed:.0} KB/s"),
+            &style,
+        );
+
+        let gpu_label = gpu_usage.map(|gpu| format!("GPU {:.0}%", gpu));
+        let net_label = format!("NET {total_speed:.0} KB/s");
+
+        handles.performance_strip.update(
+            &format!("CPU {cpu:.0}%"),
+            gpu_label.as_deref().unwrap_or("GPU —"),
+            &format!("RAM {ram_pct:.0}%"),
+            &net_label,
+        );
 
         glib::ControlFlow::Continue
     });
+}
+
+fn add_terminal_tab(notebook: &Notebook) {
+    let terminal = create_terminal();
+    let scrolled = gtk4::ScrolledWindow::new();
+    scrolled.set_child(Some(&terminal));
+    scrolled.set_vexpand(true);
+    let idx = notebook.n_pages() + 1;
+    notebook.append_page(&scrolled, Some(&Label::new(Some(&format!("T{}", idx)))));
+    notebook.set_current_page(Some(idx as u32));
+}
+
+fn apply_settings(handles: &UiHandles, settings: &Settings) {
+    apply_theme(&handles.root, &settings.theme);
+    handles.terminal_section.set_visible(settings.show_terminal);
+    handles
+        .monitoring_section
+        .set_visible(settings.show_monitoring);
+    handles.monitor_cards.set_visibility(settings);
+    handles
+        .shortcuts_panel
+        .set_revealed(settings.show_shortcuts_panel);
+    handles.window.set_resizable(!settings.lock_size);
+    handles.monitor_cards.set_style(&settings.monitor_style);
+}
+
+fn apply_theme(root: &Box, theme: &Theme) {
+    for cls in &[
+        "theme-dark",
+        "theme-light",
+        "theme-solarized",
+        "theme-tokyo",
+    ] {
+        root.remove_css_class(cls);
+    }
+    let class_name = match theme {
+        Theme::Dark => "theme-dark",
+        Theme::Light => "theme-light",
+        Theme::Solarized => "theme-solarized",
+        Theme::Tokyo => "theme-tokyo",
+    };
+    root.add_css_class(class_name);
+}
+
+fn build_header(window: &ApplicationWindow, settings: Rc<RefCell<Settings>>) -> HeaderBar {
+    let header = Box::new(Orientation::Horizontal, 8);
+    header.add_css_class("window-header");
+
+    let title = Label::new(Some("Vitray"));
+    title.add_css_class("title");
+
+    let spacer = Box::new(Orientation::Horizontal, 6);
+    spacer.set_hexpand(true);
+
+    let settings_btn = Button::from_icon_name("emblem-system-symbolic");
+    settings_btn.add_css_class("icon-btn");
+
+    let shortcuts_btn = Button::from_icon_name("starred-symbolic");
+    shortcuts_btn.add_css_class("icon-btn");
+    shortcuts_btn.set_tooltip_text(Some("List shortcuts"));
+
+    let minimize_btn = Button::from_icon_name("window-minimize-symbolic");
+    minimize_btn.add_css_class("icon-btn");
+
+    let maximize_btn = Button::from_icon_name("view-fullscreen-symbolic");
+    maximize_btn.add_css_class("icon-btn");
+
+    let close_btn = Button::from_icon_name("window-close-symbolic");
+    close_btn.add_css_class("icon-btn");
+
+    header.append(&title);
+    header.append(&spacer);
+    header.append(&shortcuts_btn);
+    header.append(&settings_btn);
+    header.append(&minimize_btn);
+    header.append(&maximize_btn);
+    header.append(&close_btn);
+
+    {
+        let win = window.clone();
+        close_btn.connect_clicked(move |_| win.close());
+    }
+
+    {
+        let win = window.clone();
+        minimize_btn.connect_clicked(move |_| {
+            win.minimize();
+        });
+    }
+
+    {
+        let win = window.clone();
+        maximize_btn.connect_clicked(move |_| {
+            if win.is_maximized() {
+                win.unmaximize();
+            } else {
+                win.maximize();
+            }
+        });
+    }
+
+    // Drag to move when unlocked
+    let win = window.clone();
+    let settings_drag = settings.clone();
+    let gesture = GestureClick::new();
+    gesture.connect_pressed(move |g, _n, x, y| {
+        if settings_drag.borrow().lock_in_place {
+            return;
+        }
+        if let Some(surface) = win.surface() {
+            let display = surface.display();
+            if let Ok(toplevel) = surface.downcast::<gdk::Toplevel>() {
+                if let Some(seat) = display.default_seat() {
+                    if let Some(pointer) = seat.pointer() {
+                        toplevel.begin_move(
+                            &pointer,
+                            g.current_button() as i32,
+                            x,
+                            y,
+                            g.current_event_time(),
+                        );
+                    }
+                }
+            }
+        }
+    });
+    header.add_controller(gesture);
+
+    HeaderBar {
+        widget: header,
+        settings_btn,
+        shortcuts_btn,
+    }
+}
+
+fn build_context_menu(handles: UiHandles) {
+    let popover = Popover::builder().has_arrow(true).build();
+    popover.set_parent(&handles.window);
+
+    let column = Box::new(Orientation::Vertical, 8);
+    column.set_margin_top(10);
+    column.set_margin_bottom(10);
+    column.set_margin_start(12);
+    column.set_margin_end(12);
+
+    let settings_btn = Button::with_label("Settings");
+    settings_btn.add_css_class("pill-btn");
+    column.append(&settings_btn);
+
+    let lock_toggle = gtk4::CheckButton::with_label("Lock position");
+    lock_toggle.set_active(handles.settings.borrow().lock_in_place);
+    column.append(&lock_toggle);
+
+    let size_toggle = gtk4::CheckButton::with_label("Lock size");
+    size_toggle.set_active(handles.settings.borrow().lock_size);
+    column.append(&size_toggle);
+
+    let shortcuts_toggle = gtk4::CheckButton::with_label("Toggle shortcuts panel");
+    shortcuts_toggle.set_active(handles.settings.borrow().show_shortcuts_panel);
+    column.append(&shortcuts_toggle);
+
+    let minimize_btn = Button::with_label("Minimize");
+    let close_btn = Button::with_label("Close");
+    close_btn.add_css_class("danger");
+    column.append(&minimize_btn);
+    column.append(&close_btn);
+
+    popover.set_child(Some(&column));
+
+    let gesture = GestureClick::new();
+    gesture.set_button(3);
+    let pop_clone = popover.clone();
+    gesture.connect_pressed(move |_, _, x, y| {
+        pop_clone.set_pointing_to(Some(&gdk::Rectangle::new(x as i32, y as i32, 1, 1)));
+        pop_clone.popup();
+    });
+    handles.window.add_controller(gesture);
+
+    {
+        let win = handles.window.clone();
+        let pop = popover.clone();
+        minimize_btn.connect_clicked(move |_| {
+            win.minimize();
+            pop.popdown();
+        });
+    }
+
+    {
+        let win = handles.window.clone();
+        close_btn.connect_clicked(move |_| {
+            win.close();
+        });
+    }
+
+    {
+        let handles_clone = handles.clone();
+        let pop = popover.clone();
+        settings_btn.connect_clicked(move |_| {
+            let settings_rc = handles_clone.settings.clone();
+            let handles_apply = handles_clone.clone();
+            show_settings_window(
+                &handles_clone.window,
+                settings_rc,
+                move |updated: Settings| {
+                    handles_apply.settings.replace(updated.clone());
+                    apply_settings(&handles_apply, &updated);
+                },
+            );
+            pop.popdown();
+        });
+    }
+
+    {
+        let handles_clone = handles.clone();
+        lock_toggle.connect_toggled(move |btn| {
+            let mut s = handles_clone.settings.borrow_mut();
+            s.lock_in_place = btn.is_active();
+            s.save();
+            let snapshot = s.clone();
+            drop(s);
+            apply_settings(&handles_clone, &snapshot);
+        });
+    }
+
+    {
+        let handles_clone = handles.clone();
+        size_toggle.connect_toggled(move |btn| {
+            let mut s = handles_clone.settings.borrow_mut();
+            s.lock_size = btn.is_active();
+            s.save();
+            let snapshot = s.clone();
+            drop(s);
+            apply_settings(&handles_clone, &snapshot);
+        });
+    }
+
+    {
+        let handles_clone = handles.clone();
+        shortcuts_toggle.connect_toggled(move |btn| {
+            let mut s = handles_clone.settings.borrow_mut();
+            s.show_shortcuts_panel = btn.is_active();
+            s.save();
+            let snapshot = s.clone();
+            drop(s);
+            apply_settings(&handles_clone, &snapshot);
+        });
+    }
 }

@@ -1,68 +1,275 @@
+/* Core skin */
+:root {
+    --bg: rgba(18, 22, 30, 0.78);
+    --glass-border: rgba(255, 255, 255, 0.08);
+    --text-strong: #e7ecf5;
+    --text-dim: #9eb0c7;
+    --accent: #6dd3ff;
+    --accent-2: #7e8cff;
+    --danger: #ef6c6c;
+    --surface: rgba(255, 255, 255, 0.04);
+    --shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+}
+
+.theme-light {
+    --bg: rgba(248, 250, 252, 0.9);
+    --glass-border: rgba(0, 0, 0, 0.08);
+    --text-strong: #111827;
+    --text-dim: #4b5563;
+    --accent: #2563eb;
+    --accent-2: #22c55e;
+    --surface: rgba(0, 0, 0, 0.04);
+}
+
+.theme-solarized {
+    --bg: rgba(0, 43, 54, 0.85);
+    --glass-border: rgba(147, 161, 161, 0.2);
+    --text-strong: #fdf6e3;
+    --text-dim: #93a1a1;
+    --accent: #268bd2;
+    --accent-2: #b58900;
+    --surface: rgba(0, 43, 54, 0.35);
+}
+
+.theme-tokyo {
+    --bg: rgba(22, 30, 45, 0.88);
+    --glass-border: rgba(84, 101, 140, 0.5);
+    --text-strong: #d6dfe9;
+    --text-dim: #8c9bb4;
+    --accent: #7aa2f7;
+    --accent-2: #e0af68;
+    --surface: rgba(35, 43, 62, 0.85);
+}
+
 window.glass-window {
     background-color: transparent;
 }
 
+.root {
+    background: transparent;
+}
+
 .glass-panel {
-    background-color: rgba(0, 0, 0, 0.75);
-    border-radius: 16px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2);
-    color: white;
-    margin: 10px;
+    background: var(--bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 18px;
+    box-shadow: var(--shadow);
+    color: var(--text-strong);
+    padding: 12px;
+}
+
+.window-header {
+    background: linear-gradient(90deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0.05));
+    border-radius: 12px;
+    padding: 10px 12px;
+    align-items: center;
+}
+
+.window-header .title {
+    font-weight: 800;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    color: var(--text-strong);
+}
+
+.icon-btn, .pill-btn {
+    background: var(--surface);
+    border: 1px solid var(--glass-border);
+    color: var(--text-strong);
+    border-radius: 10px;
+    padding: 6px 10px;
+    transition: background 120ms ease, border-color 120ms ease, transform 120ms ease;
+}
+
+.icon-btn image, .icon-btn label {
+    color: var(--text-strong);
+}
+
+.icon-btn:hover, .pill-btn:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.12);
+    transform: translateY(-1px);
+}
+
+.icon-btn:active, .pill-btn:active {
+    transform: translateY(0);
+}
+
+.pill-btn {
+    font-weight: 600;
+}
+
+.perf-ribbon {
+    margin-top: 6px;
+    padding: 6px 10px;
+    border-radius: 10px;
+    background: linear-gradient(90deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.08));
+}
+
+.perf-chip {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--glass-border);
+    border-radius: 999px;
+    padding: 4px 10px;
+    font-size: 11px;
+    color: var(--text-strong);
 }
 
 /* Terminal */
+.terminal-section {
+    background: var(--surface);
+    border-radius: 14px;
+    padding: 10px;
+    border: 1px solid var(--glass-border);
+}
+
+.terminal-header {
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 10px;
+    padding: 6px 8px;
+    border: 1px dashed var(--glass-border);
+    color: var(--text-dim);
+}
+
 .terminal-notebook {
     background: transparent;
 }
 
 .terminal-notebook tab {
     background-color: rgba(255, 255, 255, 0.05);
-    color: #aaa;
+    color: var(--text-dim);
     border: none;
     padding: 5px 10px;
+    border-radius: 8px 8px 0 0;
 }
 
 .terminal-notebook tab:checked {
-    background-color: rgba(255, 255, 255, 0.15);
-    color: white;
+    background-color: rgba(255, 255, 255, 0.12);
+    color: var(--text-strong);
 }
 
-/* Monitoring Grid */
-.monitoring-grid {
-    padding: 10px;
-}
-
-.monitor-card {
-    background-color: rgba(255, 255, 255, 0.05);
-    border-radius: 12px;
-    padding: 15px;
-    min-width: 80px;
-    min-height: 60px;
-}
-
-.card-title {
-    font-size: 12px;
-    color: #888;
-    font-weight: bold;
-}
-
-.card-value {
-    font-size: 20px;
-    font-weight: bold;
-    color: #fff;
-}
-
-.status-warning {
-    color: #facc15; /* Yellow */
-}
-
-.status-critical {
-    color: #f87171; /* Red */
+.glass-terminal, vte-terminal {
+    background: transparent;
+    color: var(--text-strong);
+    font-family: "JetBrains Mono", "Fira Code", "Liberation Mono", monospace;
 }
 
 .section-separator {
-    background-color: rgba(255, 255, 255, 0.1);
+    background-color: rgba(255, 255, 255, 0.12);
     min-height: 1px;
-    margin: 0 10px;
+    margin: 6px 0;
+}
+
+/* Monitoring */
+.monitoring-shell > label {
+    font-weight: 700;
+    letter-spacing: 0.4px;
+    color: var(--text-dim);
+}
+
+.monitoring-grid {
+    padding: 6px;
+}
+
+.monitor-card {
+    background: transparent;
+    border-radius: 12px;
+    padding: 8px 6px;
+    min-width: 90px;
+    min-height: 70px;
+    border: 1px dashed var(--glass-border);
+}
+
+.card-title {
+    font-size: 11px;
+    color: var(--text-dim);
+    letter-spacing: 0.3px;
+}
+
+.card-value {
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--text-strong);
+}
+
+.trend-up {
+    color: #7bd88f;
+}
+
+.trend-down {
+    color: #ef6c6c;
+}
+
+.trend-stable {
+    color: #9eb0c7;
+}
+
+.monitor-bar {
+    min-height: 8px;
+    border-radius: 6px;
+}
+
+.monitor-chart {
+    min-height: 40px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 10px;
+}
+
+/* Shortcuts */
+.shortcuts-panel {
+    background: var(--surface);
+    border-radius: 14px;
+    padding: 10px;
+    border: 1px solid var(--glass-border);
+    min-width: 240px;
+}
+
+.panel-title {
+    font-weight: 700;
+    color: var(--text-strong);
+}
+
+.shortcut-list {
+    background: transparent;
+    border: 1px dashed var(--glass-border);
+    border-radius: 10px;
+    padding: 6px;
+}
+
+.shortcut-row {
+    padding: 8px;
+    border-radius: 10px;
+}
+
+.shortcut-row:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.shortcut-title {
+    font-weight: 700;
+    color: var(--text-strong);
+}
+
+.shortcut-command {
+    font-size: 12px;
+    color: var(--text-dim);
+}
+
+.popover-label {
+    color: var(--text-strong);
+}
+
+.danger {
+    background: rgba(239, 108, 108, 0.12);
+    border-color: rgba(239, 108, 108, 0.4);
+    color: #ffd8d8;
+}
+
+.side-gap {
+    min-width: 6px;
+    opacity: 0.6;
+}
+
+.help-text text {
+    color: var(--text-strong);
 }

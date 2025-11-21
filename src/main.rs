@@ -1,24 +1,47 @@
+use crate::shortcuts::Shortcuts;
+use crate::ui::build_ui;
+use clap::{ArgAction, Parser};
 use gtk4::prelude::*;
 use gtk4::Application;
-use clap::Parser;
-use crate::ui::build_ui;
-use crate::shortcuts::Shortcuts;
+use std::process::Command;
 
+mod gpu;
 mod monitor;
+mod settings;
+mod settings_ui;
+mod shortcuts;
+mod shortcuts_ui;
 mod terminal;
 mod ui;
-mod settings;
-mod shortcuts;
-mod gpu;
-mod settings_ui;
-mod shortcuts_ui;
 
 #[derive(Parser, Debug)]
-#[command(author, version, about, long_about = None)]
+#[command(
+    author,
+    version,
+    about = "Vitray widget: glassy terminal + performance HUD.",
+    long_about = "Vitray widget: a glassy terminal with performance monitoring, shortcuts, and themes.",
+    after_help = "Examples:\n  vitray --shortcut \"htop\" \"Monitor\"\n  vitray --remove-shortcut \"Monitor\"\n  vitray --list-shortcuts\n  vitray deploy   # runs saved shortcut named 'deploy'"
+)]
 struct Args {
     /// Add a new shortcut: vitray --shortcut "command" "name"
     #[arg(long, num_args = 2, value_names = ["COMMAND", "NAME"])]
     shortcut: Option<Vec<String>>,
+
+    /// Remove a shortcut by name
+    #[arg(long, value_name = "NAME")]
+    remove_shortcut: Option<String>,
+
+    /// List saved shortcuts
+    #[arg(long, action = ArgAction::SetTrue)]
+    list_shortcuts: bool,
+
+    /// Run a saved shortcut: vitray --run "name"
+    #[arg(long, value_name = "NAME")]
+    run: Option<String>,
+
+    /// Run a saved shortcut directly: vitray <name>
+    #[arg(value_name = "SHORTCUT")]
+    shortcut_name: Option<String>,
 }
 
 fn main() {
@@ -35,10 +58,47 @@ fn main() {
         }
     }
 
-    let app = Application::new(
-        Some("com.moebius.vitray-widget"),
-        Default::default(),
-    );
+    if let Some(name) = args.remove_shortcut {
+        let mut shortcuts = Shortcuts::load();
+        if shortcuts.remove_by_name(&name) {
+            println!("Removed shortcut '{}'", name);
+        } else {
+            eprintln!("Shortcut '{}' not found", name);
+        }
+        return;
+    }
+
+    if args.list_shortcuts {
+        let shortcuts = Shortcuts::load();
+        if shortcuts.items.is_empty() {
+            println!("No shortcuts defined. Add one with --shortcut \"command\" \"name\".");
+        } else {
+            println!("Saved shortcuts:");
+            for s in shortcuts.items {
+                println!("- {} :: {}", s.name, s.command);
+            }
+        }
+        return;
+    }
+
+    if let Some(name) = args.run.or(args.shortcut_name) {
+        let shortcuts = Shortcuts::load();
+        if let Some(shortcut) = shortcuts.find(&name) {
+            println!("→ Running {} :: {}", shortcut.name, shortcut.command);
+            let _ = Command::new("bash")
+                .arg("-c")
+                .arg(shortcut.command)
+                .status();
+        } else {
+            eprintln!(
+                "Shortcut '{}' not found. Use --list-shortcuts to see available entries.",
+                name
+            );
+        }
+        return;
+    }
+
+    let app = Application::new(Some("com.moebius.vitray-widget"), Default::default());
 
     app.connect_activate(|app| {
         build_ui(app);

@@ -1,7 +1,7 @@
+use auto_launch;
+use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
 use std::fs;
-use directories::ProjectDirs;
-use auto_launch;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum Theme {
@@ -19,26 +19,37 @@ pub enum MonitorStyle {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(default)]
 pub struct Settings {
     pub theme: Theme,
+    pub show_terminal: bool,
+    pub show_monitoring: bool,
+    pub show_shortcuts_panel: bool,
     pub show_cpu: bool,
     pub show_gpu: bool,
     pub show_ram: bool,
     pub show_network: bool,
     pub monitor_style: MonitorStyle,
     pub launch_at_start: bool,
+    pub lock_in_place: bool,
+    pub lock_size: bool,
 }
 
 impl Default for Settings {
     fn default() -> Self {
         Self {
             theme: Theme::Dark,
+            show_terminal: true,
+            show_monitoring: true,
+            show_shortcuts_panel: true,
             show_cpu: true,
             show_gpu: true,
             show_ram: true,
             show_network: true,
-            monitor_style: MonitorStyle::Bar,
+            monitor_style: MonitorStyle::Text,
             launch_at_start: false,
+            lock_in_place: true,
+            lock_size: true,
         }
     }
 }
@@ -48,7 +59,7 @@ impl Settings {
         if let Some(proj_dirs) = ProjectDirs::from("com", "moebius", "vitray-widget") {
             let config_dir = proj_dirs.config_dir();
             let config_file = config_dir.join("settings.json");
-            
+
             if config_file.exists() {
                 if let Ok(content) = fs::read_to_string(config_file) {
                     if let Ok(settings) = serde_json::from_str(&content) {
