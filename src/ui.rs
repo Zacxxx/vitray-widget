@@ -7,7 +7,7 @@ use gtk4::{
 use std::{cell::RefCell, rc::Rc};
 use vte4::TerminalExt;
 
-use crate::monitor::SystemMonitor;
+use crate::monitor::MonitorData;
 use crate::settings::{MonitorStyle, Settings, Theme};
 use crate::settings_ui::show_settings_window;
 use crate::shortcuts::Shortcuts;
@@ -331,7 +331,7 @@ pub fn build_ui(app: &Application) {
 
     // --- Terminal channel ---
     #[allow(deprecated)]
-    let (sender, receiver) = ::glib::MainContext::channel(::glib::Priority::DEFAULT);
+    let (sender, receiver) = glib::MainContext::channel(glib::Priority::DEFAULT);
 
 
     // --- Header & Perf Strip (Main Window Content) ---
@@ -422,7 +422,7 @@ pub fn build_ui(app: &Application) {
     receiver.attach(None, move |cmd: String| {
         let cmd_with_newline = format!("{}\n", cmd);
         terminal.feed_child(cmd_with_newline.as_bytes());
-        ::glib::ControlFlow::Continue
+        glib::ControlFlow::Continue
     });
 
     {
@@ -490,24 +490,21 @@ pub fn build_ui(app: &Application) {
     main_window.present();
 
 
-    // --- Update Loop ---
-    let monitor = Rc::new(RefCell::new(SystemMonitor::new()));
+    // --- Update Loop (Async) ---
+    let monitor_receiver = crate::monitor::start_monitoring_service();
     let mut last_net: Option<(u64, u64)> = None;
 
-    glib::timeout_add_seconds_local(1, move || {
-        let mut mon = monitor.borrow_mut();
-        mon.refresh();
+    monitor_receiver.attach(None, move |data| {
         let active_settings = handles.settings.borrow().clone();
         let style = active_settings.monitor_style.clone();
 
-        let cpu = mon.get_cpu_usage() as f64;
+        let cpu = data.cpu_usage as f64;
         handles
             .monitor_cards
             .cpu
             .update(cpu, &format!("{cpu:.0}%"), &style);
 
-        let gpu_usage = mon.get_gpu_usage();
-        // TODO(senior-ui): Detect when GPUs go to sleep and slow the polling rate to cut power use.
+        let gpu_usage = data.gpu_usage;
         if let Some(gpu) = gpu_usage {
             handles
                 .monitor_cards
@@ -517,7 +514,7 @@ pub fn build_ui(app: &Application) {
             handles.monitor_cards.gpu.update(0.0, "N/A", &style);
         }
 
-        let (used, total) = mon.get_ram_usage();
+        let (used, total) = (data.ram_used, data.ram_total);
         let used_gb = used as f64 / 1024.0 / 1024.0 / 1024.0;
         let total_gb = total as f64 / 1024.0 / 1024.0 / 1024.0;
         let ram_pct = if total > 0 {
@@ -531,7 +528,7 @@ pub fn build_ui(app: &Application) {
             &style,
         );
 
-        let (rx_raw, tx_raw) = mon.get_network_stats();
+        let (rx_raw, tx_raw) = (data.rx_bytes, data.tx_bytes);
         let (rx_rate, tx_rate) = if let Some((prev_rx, prev_tx)) = last_net {
             (
                 rx_raw.saturating_sub(prev_rx),
@@ -694,8 +691,8 @@ fn apply_settings(handles: &UiHandles, settings: &Settings) {
 fn apply_dynamic_styles(provider: &CssProvider, settings: &Settings) {
     let gen_css = |selector: &str, style: &crate::settings::SectionStyle| {
         format!(
-            "{} {{ background-color: {}; opacity: {}; font-size: {}px; border-radius: {}px; }}",
-            selector, style.bg_color, style.opacity, style.font_size, style.border_radius
+            "{} {{ background-color: {}; opacity: {}; font-size: {}px; font-family: '{}'; border-radius: {}px; }}",
+            selector, style.bg_color, style.opacity, style.font_size, style.font_family, style.border_radius
         )
     };
 
