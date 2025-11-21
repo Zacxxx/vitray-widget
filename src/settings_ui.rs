@@ -1,6 +1,6 @@
 use gtk4::prelude::*;
 use gtk4::{Window, Box, Orientation, Label, Switch, ComboBoxText, Button};
-use crate::settings::{Settings, Theme, MonitorStyle};
+use crate::settings::{Settings, Theme};
 
 pub fn show_settings_window(parent: &impl IsA<Window>) {
     let window = Window::new();

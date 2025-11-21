@@ -1,7 +1,5 @@
-use gtk4::prelude::*;
 use vte4::{Terminal, TerminalExtManual, PtyFlags};
 use gtk4::{glib, gio};
-use std::path::Path;
 
 pub fn create_terminal() -> Terminal {
     let terminal = Terminal::new();

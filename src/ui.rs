@@ -1,7 +1,7 @@
 use gtk4::prelude::*;
 use gtk4::{
-    Application, ApplicationWindow, Box, Label, Orientation, ProgressBar, CssProvider, 
-    Grid, Notebook, GestureClick, PopoverMenu, gio, glib
+    Application, ApplicationWindow, Box, Label, Orientation, CssProvider, 
+    Grid, Notebook, GestureClick, glib
 };
 use crate::monitor::SystemMonitor;
 use crate::terminal::create_terminal;
@@ -119,6 +119,7 @@ pub fn build_ui(app: &Application) {
     window.set_child(Some(&main_box));
 
     // --- Shortcuts Channel ---
+    #[allow(deprecated)]
     let (sender, receiver) = ::glib::MainContext::channel(::glib::Priority::DEFAULT);
     
     let terminal_clone = terminal.clone();

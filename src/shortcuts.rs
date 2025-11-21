@@ -47,6 +47,7 @@ impl Shortcuts {
         self.save();
     }
 
+    #[allow(dead_code)]
     pub fn remove(&mut self, index: usize) {
         if index < self.items.len() {
             self.items.remove(index);
