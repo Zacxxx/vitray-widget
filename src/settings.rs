@@ -21,6 +21,8 @@ pub enum MonitorStyle {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(default)]
 pub struct Settings {
+    // TODO(senior-ui): Persist window geometry, opacity, and monitor affinity to avoid the widget
+    // jumping between workspaces each launch.
     pub theme: Theme,
     pub show_terminal: bool,
     pub show_monitoring: bool,
@@ -66,6 +68,8 @@ impl Settings {
                         return settings;
                     }
                 }
+                // TODO(senior-ui): Surface JSON parsing errors in-app so users know why their
+                // preferences reset instead of silently reverting to defaults.
             }
         }
         Self::default()
@@ -89,6 +93,8 @@ impl Settings {
 
         if let Ok(exe_path) = std::env::current_exe() {
             if let Some(exe_str) = exe_path.to_str() {
+                // TODO(senior-ui): Detect init system (systemd, gnome-session, sway) and register
+                // the autostart entry appropriately instead of relying solely on launch agents.
                 let auto = auto_launch::AutoLaunchBuilder::new()
                     .set_app_name("vitray-widget")
                     .set_app_path(exe_str)

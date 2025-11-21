@@ -99,6 +99,8 @@ fn main() {
     }
 
     let app = Application::new(Some("com.moebius.vitray-widget"), Default::default());
+    // TODO(senior-ui): Register a single-instance DBus name and raise the existing window when
+    // invoked again instead of spawning duplicate widgets.
 
     app.connect_activate(|app| {
         build_ui(app);

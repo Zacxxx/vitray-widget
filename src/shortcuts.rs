@@ -43,6 +43,7 @@ impl Shortcuts {
     }
 
     pub fn add(&mut self, name: String, command: String) {
+        // TODO(senior-ui): Enforce unique, slug-safe names so the CLI/GUI stay in sync.
         self.items.push(Shortcut { name, command });
         self.save();
     }
@@ -57,6 +58,7 @@ impl Shortcuts {
     }
 
     pub fn upsert(&mut self, name: String, command: String) {
+        // TODO(senior-ui): Track created/updated timestamps for ordering + telemetry.
         if let Some(existing) = self.items.iter_mut().find(|s| s.name == name) {
             existing.command = command;
         } else {
@@ -72,6 +74,7 @@ impl Shortcuts {
             self.save();
             return true;
         }
+        // TODO(senior-ui): Bubble an error to the UI when rename fails so users get actionable feedback.
         false
     }
 

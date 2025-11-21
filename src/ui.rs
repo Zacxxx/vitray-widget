@@ -37,6 +37,8 @@ impl PerformanceStrip {
             lbl.add_css_class("perf-chip");
             lbl
         };
+        // TODO(senior-ui): Promote chips to interactive pills with tooltips and per-metric settings
+        // (sampling rate, thresholds) instead of static labels.
 
         Self {
             cpu: chip("CPU —"),
@@ -108,6 +110,8 @@ impl MonitorCard {
 
         let chart = DrawingArea::new();
         chart.add_css_class("monitor-chart");
+        // TODO(senior-ui): Swap to GtkPlot or custom GPU-accelerated canvas so historical data looks
+        // smooth and can display tooltips on hover.
         stack.add_named(&chart, Some("chart"));
 
         container.append(&stack);
@@ -203,6 +207,8 @@ impl MonitorCard {
             if hist.len() > 80 {
                 hist.remove(0);
             }
+            // TODO(senior-ui): Make history depth adaptive to window width so charts don't stretch
+            // identical 80 samples regardless of available pixels.
         }
         self.chart.queue_draw();
     }
@@ -245,7 +251,6 @@ struct UiHandles {
     monitor_cards: MonitorGroup,
     performance_strip: PerformanceStrip,
     shortcuts_panel: ShortcutsPanel,
-    notebook: Notebook,
     settings: Rc<RefCell<Settings>>,
 }
 
@@ -279,6 +284,8 @@ pub fn build_ui(app: &Application) {
     window.set_title(Some("Vitray Widget"));
     window.set_default_size(520, 760);
     window.set_decorated(false);
+    // TODO(senior-ui): Detect compositor capabilities and toggle blur/shadows automatically so the
+    // glass effect renders well on Mutter, KWin, and Hyprland.
     window.add_css_class("glass-window");
     window.set_resizable(!settings.borrow().lock_size);
 
@@ -311,6 +318,8 @@ pub fn build_ui(app: &Application) {
     terminal_header.add_css_class("terminal-header");
     let tabs_btn = Button::with_label("+ Tab");
     tabs_btn.add_css_class("pill-btn");
+    // TODO(senior-ui): Introduce closable, reorderable tabs with status indicators so multiple
+    // sessions stay manageable in tight vertical layouts.
     let shortcuts_btn = Button::with_label("Shortcuts");
     shortcuts_btn.add_css_class("pill-btn");
     terminal_header.append(&Label::new(Some("Terminal")));
@@ -322,8 +331,11 @@ pub fn build_ui(app: &Application) {
     notebook.set_show_tabs(true);
     notebook.set_scrollable(true);
     notebook.add_css_class("terminal-notebook");
+    // TODO(senior-ui): Persist tabs + working directories so a reboot restores the same workspace.
 
     let terminal = create_terminal();
+    // TODO(senior-ui): Allow each page to bind to saved shortcuts (Deploy, Monitor) instead of
+    // generic names like T1/T2.
     let scrolled = gtk4::ScrolledWindow::new();
     scrolled.set_child(Some(&terminal));
     scrolled.set_vexpand(true);
@@ -355,6 +367,8 @@ pub fn build_ui(app: &Application) {
         ram: MonitorCard::new("RAM", &settings.borrow().monitor_style, 100.0),
         net: MonitorCard::new("Network", &settings.borrow().monitor_style, 2000.0),
     };
+    // TODO(senior-ui): Let users reorder / collapse these cards and expose additional sensors
+    // (swap, temps, battery) pulled from sysfs to tailor the dashboard.
 
     grid.attach(&monitor_cards.cpu.container, 0, 0, 1, 1);
     grid.attach(&monitor_cards.gpu.container, 1, 0, 1, 1);
@@ -368,6 +382,8 @@ pub fn build_ui(app: &Application) {
 
     // --- Shortcuts side panel ---
     let shortcuts_panel = ShortcutsPanel::new(&window, sender.clone());
+    // TODO(senior-ui): Animate panel width responsively and snap it to the opposite edge on RTL
+    // locales so it doesn't fight terminal space on ultra-wide screens.
     shortcuts_panel.set_revealed(settings.borrow().show_shortcuts_panel);
 
     root.append(&main_column);
@@ -403,7 +419,6 @@ pub fn build_ui(app: &Application) {
         monitor_cards: monitor_cards.clone(),
         performance_strip: performance_strip.clone(),
         shortcuts_panel: shortcuts_panel.clone(),
-        notebook: notebook.clone(),
         settings: settings.clone(),
     };
 
@@ -453,6 +468,7 @@ pub fn build_ui(app: &Application) {
             .update(cpu, &format!("{cpu:.0}%"), &style);
 
         let gpu_usage = mon.get_gpu_usage();
+        // TODO(senior-ui): Detect when GPUs go to sleep and slow the polling rate to cut power use.
         if let Some(gpu) = gpu_usage {
             handles
                 .monitor_cards
@@ -487,6 +503,7 @@ pub fn build_ui(app: &Application) {
         };
         last_net = Some((rx_raw, tx_raw));
         let total_speed = (rx_rate + tx_rate) as f64 / 1024.0;
+        // TODO(senior-ui): Show download/upload separately w/ icons + convert to Mbps for >1Gb links.
         handles.monitor_cards.net.update(
             total_speed.min(2000.0),
             &format!("{total_speed:.0} KB/s"),
@@ -514,6 +531,8 @@ fn add_terminal_tab(notebook: &Notebook) {
     scrolled.set_vexpand(true);
     let idx = notebook.n_pages() + 1;
     notebook.append_page(&scrolled, Some(&Label::new(Some(&format!("T{}", idx)))));
+    // TODO(senior-ui): Add inline close buttons + "rename tab" affordance so power users can label
+    // SSH sessions or tasks.
     notebook.set_current_page(Some(idx as u32));
 }
 
@@ -546,6 +565,7 @@ fn apply_theme(root: &Box, theme: &Theme) {
         Theme::Solarized => "theme-solarized",
         Theme::Tokyo => "theme-tokyo",
     };
+    // TODO(senior-ui): Allow custom accent colors + transparency slider instead of fixed presets.
     root.add_css_class(class_name);
 }
 
@@ -555,6 +575,7 @@ fn build_header(window: &ApplicationWindow, settings: Rc<RefCell<Settings>>) -> 
 
     let title = Label::new(Some("Vitray"));
     title.add_css_class("title");
+    // TODO(senior-ui): Inject workspace name/time widgets here so the header does more than branding.
 
     let spacer = Box::new(Orientation::Horizontal, 6);
     spacer.set_hexpand(true);
@@ -665,6 +686,7 @@ fn build_context_menu(handles: UiHandles) {
     let shortcuts_toggle = gtk4::CheckButton::with_label("Toggle shortcuts panel");
     shortcuts_toggle.set_active(handles.settings.borrow().show_shortcuts_panel);
     column.append(&shortcuts_toggle);
+    // TODO(senior-ui): Expand context menu with opacity slider + monitor picker for multi-head rigs.
 
     let minimize_btn = Button::with_label("Minimize");
     let close_btn = Button::with_label("Close");
