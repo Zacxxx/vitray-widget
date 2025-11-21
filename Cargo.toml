@@ -1,6 +1,6 @@
 [package]
 name = "vitray-widget"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 description = "A glassmorphic desktop widget for system monitoring and terminal access."
 license = "MIT"
@@ -23,5 +23,6 @@ depends = "$auto, libgtk-4-1, libvte-2.91-gtk4-0"
 assets = [
     ["target/release/vitray-widget", "usr/bin/", "755"],
     ["assets/vitray-widget.desktop", "usr/share/applications/", "644"],
+    ["assets/icon.png", "usr/share/icons/hicolor/512x512/apps/vitray-widget.png", "644"],
     ["src/style.css", "usr/share/vitray-widget/style.css", "644"],
 ]

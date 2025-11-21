@@ -2,8 +2,7 @@ use gtk4::gdk::prelude::*;
 use gtk4::prelude::*;
 use gtk4::{
     gdk, glib, Align, Application, ApplicationWindow, Box, Button, CssProvider, DrawingArea,
-    GestureClick, Grid, Label, LevelBar, Notebook, Orientation, Popover, Separator, Stack,
-    StackTransitionType,
+    GestureClick, Grid, Label, LevelBar, Notebook, Orientation, Popover, Stack, StackTransitionType,
 };
 use std::{cell::RefCell, rc::Rc};
 use vte4::TerminalExt;
@@ -263,14 +262,15 @@ impl MonitorGroup {
 
 #[derive(Clone)]
 struct UiHandles {
-    window: ApplicationWindow,
-    root: Box,
-    terminal_section: Box,
-    monitoring_section: Box,
+    main_window: ApplicationWindow,
+    terminal_window: ApplicationWindow,
+    monitor_window: ApplicationWindow,
+    shortcuts_window: ApplicationWindow,
     monitor_cards: MonitorGroup,
     performance_strip: PerformanceStrip,
     shortcuts_panel: ShortcutsPanel,
     settings: Rc<RefCell<Settings>>,
+    style_provider: CssProvider,
 }
 
 #[derive(Clone)]
@@ -299,53 +299,60 @@ pub fn build_ui(app: &Application) {
         );
     }
 
-    let window = ApplicationWindow::new(app);
-    window.set_title(Some("Vitray Widget"));
-    window.set_default_size(520, 760);
-    window.set_decorated(false);
-    
-    // Attempt to detect compositor and apply appropriate classes
-    if let Ok(session_type) = std::env::var("XDG_SESSION_TYPE") {
-        if session_type == "wayland" {
-             window.add_css_class("wayland-glass");
-        } else {
-             window.add_css_class("x11-glass");
-        }
+    // Dynamic style provider for user settings
+    let dynamic_provider = CssProvider::new();
+    if let Some(display) = gtk4::gdk::Display::default() {
+        gtk4::style_context_add_provider_for_display(
+            &display,
+            &dynamic_provider,
+            gtk4::STYLE_PROVIDER_PRIORITY_APPLICATION + 1,
+        );
     }
-    window.add_css_class("glass-window");
-    window.set_resizable(!settings.borrow().lock_size);
+
+    // --- Main Control Window ---
+    let main_window = ApplicationWindow::new(app);
+    main_window.set_title(Some("Vitray Control"));
+    main_window.set_default_size(600, 100);
+    main_window.set_decorated(false); // Keep it clean
+    main_window.add_css_class("glass-window");
+    
+    // --- Terminal Window ---
+    let terminal_window = create_standalone_window(app, "Terminal", 600, 400);
+    terminal_window.add_css_class("terminal-window");
+
+    // --- Monitor Window ---
+    let monitor_window = create_standalone_window(app, "Vitals", 600, 300);
+    monitor_window.add_css_class("monitor-window");
+
+    // --- Shortcuts Window ---
+    let shortcuts_window = create_standalone_window(app, "Shortcuts", 300, 500);
+    shortcuts_window.add_css_class("shortcuts-window");
+
 
     // --- Terminal channel ---
     #[allow(deprecated)]
     let (sender, receiver) = ::glib::MainContext::channel(::glib::Priority::DEFAULT);
 
-    // --- Root layout ---
-    let root = Box::new(Orientation::Horizontal, 10);
-    root.add_css_class("root");
-    root.set_margin_top(10);
-    root.set_margin_bottom(10);
-    root.set_margin_start(10);
-    root.set_margin_end(10);
 
-    let main_column = Box::new(Orientation::Vertical, 12);
-    main_column.add_css_class("glass-panel");
-
-    // --- Header ---
+    // --- Header & Perf Strip (Main Window Content) ---
+    let main_content = Box::new(Orientation::Vertical, 0);
+    main_content.add_css_class("glass-panel");
+    
     let performance_strip = PerformanceStrip::new();
-    let header = build_header(&window, settings.clone());
-    main_column.append(&header.widget);
-    main_column.append(&performance_strip.widget());
+    let header = build_header(&main_window, settings.clone());
+    main_content.append(&header.widget);
+    main_content.append(&performance_strip.widget());
+    main_window.set_child(Some(&main_content));
 
-    // --- Terminal Section ---
+    // --- Terminal Section Content ---
     let terminal_section = Box::new(Orientation::Vertical, 6);
     terminal_section.add_css_class("terminal-section");
-
+    
     let terminal_header = Box::new(Orientation::Horizontal, 8);
     terminal_header.add_css_class("terminal-header");
     let tabs_btn = Button::with_label("+ Tab");
     tabs_btn.add_css_class("pill-btn");
     
-    // Enable reordering
     let notebook = Notebook::new();
     notebook.set_show_tabs(true);
     notebook.set_scrollable(true);
@@ -358,14 +365,7 @@ pub fn build_ui(app: &Application) {
     terminal_header.append(&shortcuts_btn);
     terminal_header.set_halign(Align::Start);
 
-    // Notebook created above
-    // notebook.set_show_tabs(true); // Already set
-    // notebook.set_scrollable(true); // Already set
-    // TODO(senior-ui): Persist tabs + working directories so a reboot restores the same workspace.
-
     let terminal = create_terminal(None, None);
-    // TODO(senior-ui): Allow each page to bind to saved shortcuts (Deploy, Monitor) instead of
-    // generic names like T1/T2.
     let scrolled = gtk4::ScrolledWindow::new();
     scrolled.set_child(Some(&terminal));
     scrolled.set_vexpand(true);
@@ -377,14 +377,12 @@ pub fn build_ui(app: &Application) {
 
     terminal_section.append(&terminal_header);
     terminal_section.append(&notebook);
+    terminal_window.set_child(Some(&terminal_section));
 
-    // --- Middle separator ---
-    let separator = Separator::new(Orientation::Horizontal);
-    separator.add_css_class("section-separator");
-
-    // --- Monitoring ---
+    // --- Monitoring Section Content ---
     let monitoring_section = Box::new(Orientation::Vertical, 8);
     monitoring_section.add_css_class("monitoring-shell");
+    monitoring_section.add_css_class("glass-panel");
     monitoring_section.append(&Label::new(Some("Vitals")));
 
     let grid = Grid::new();
@@ -401,32 +399,24 @@ pub fn build_ui(app: &Application) {
         ram: MonitorCard::new("RAM", &settings.borrow().monitor_style, 100.0),
         net: MonitorCard::new("Network", &settings.borrow().monitor_style, 2000.0),
     };
-    // TODO(senior-ui): Let users reorder / collapse these cards and expose additional sensors
-    // (swap, temps, battery) pulled from sysfs to tailor the dashboard.
 
     grid.attach(&monitor_cards.cpu.container, 0, 0, 1, 1);
     grid.attach(&monitor_cards.gpu.container, 1, 0, 1, 1);
     grid.attach(&monitor_cards.ram.container, 0, 1, 1, 1);
     grid.attach(&monitor_cards.net.container, 1, 1, 1, 1);
     monitoring_section.append(&grid);
+    monitor_window.set_child(Some(&monitoring_section));
 
-    main_column.append(&terminal_section);
-    main_column.append(&separator);
-    main_column.append(&monitoring_section);
+    // --- Shortcuts Content ---
+    let shortcuts_panel = ShortcutsPanel::new(&main_window, sender.clone());
+    shortcuts_panel.set_revealed(true); // Always visible in its own window
+    
+    let shortcuts_wrapper = Box::new(Orientation::Vertical, 0);
+    shortcuts_wrapper.add_css_class("glass-panel");
+    shortcuts_wrapper.add_css_class("shortcuts-section");
+    shortcuts_wrapper.append(&shortcuts_panel.revealer);
+    shortcuts_window.set_child(Some(&shortcuts_wrapper));
 
-    // --- Shortcuts side panel ---
-    let shortcuts_panel = ShortcutsPanel::new(&window, sender.clone());
-    // TODO(senior-ui): Animate panel width responsively and snap it to the opposite edge on RTL
-    // locales so it doesn't fight terminal space on ultra-wide screens.
-    shortcuts_panel.set_revealed(settings.borrow().show_shortcuts_panel);
-
-    root.append(&main_column);
-    let gap = Separator::new(Orientation::Vertical);
-    gap.add_css_class("side-gap");
-    root.append(&gap);
-    root.append(&shortcuts_panel.revealer);
-
-    window.set_child(Some(&root));
 
     // Terminal channel feed
     receiver.attach(None, move |cmd: String| {
@@ -441,22 +431,29 @@ pub fn build_ui(app: &Application) {
     }
 
     {
-        let panel_clone = shortcuts_panel.clone();
-        shortcuts_btn.connect_clicked(move |_| panel_clone.toggle());
+        let win = shortcuts_window.clone();
+        shortcuts_btn.connect_clicked(move |_| {
+            if win.is_visible() {
+                win.hide();
+            } else {
+                win.present();
+            }
+        });
     }
 
     let handles = UiHandles {
-        window: window.clone(),
-        root: root.clone(),
-        terminal_section: terminal_section.clone(),
-        monitoring_section: monitoring_section.clone(),
+        main_window: main_window.clone(),
+        terminal_window: terminal_window.clone(),
+        monitor_window: monitor_window.clone(),
+        shortcuts_window: shortcuts_window.clone(),
         monitor_cards: monitor_cards.clone(),
         performance_strip: performance_strip.clone(),
         shortcuts_panel: shortcuts_panel.clone(),
         settings: settings.clone(),
+        style_provider: dynamic_provider,
     };
 
-    // Context menu / right click
+    // Context menu / right click (Attached to main window for now)
     build_context_menu(handles.clone());
 
     {
@@ -465,7 +462,7 @@ pub fn build_ui(app: &Application) {
             let settings_rc = handles_clone.settings.clone();
             let handles_apply = handles_clone.clone();
             show_settings_window(
-                &handles_clone.window,
+                &handles_clone.main_window,
                 settings_rc,
                 move |updated: Settings| {
                     handles_apply.settings.replace(updated.clone());
@@ -476,14 +473,22 @@ pub fn build_ui(app: &Application) {
     }
 
     {
-        let panel_clone = handles.shortcuts_panel.clone();
+        let win = handles.shortcuts_window.clone();
         header
             .shortcuts_btn
-            .connect_clicked(move |_| panel_clone.toggle());
+            .connect_clicked(move |_| {
+                 if win.is_visible() {
+                    win.hide();
+                } else {
+                    win.present();
+                }
+            });
     }
+    
     apply_settings(&handles, &settings.borrow());
 
-    window.present();
+    main_window.present();
+
 
     // --- Update Loop ---
     let monitor = Rc::new(RefCell::new(SystemMonitor::new()));
@@ -663,27 +668,65 @@ fn prompt_rename(parent: &gtk4::Window, label: &Label) {
 }
 
 fn apply_settings(handles: &UiHandles, settings: &Settings) {
-    apply_theme(&handles.root, &settings.theme);
-    handles.terminal_section.set_visible(settings.show_terminal);
-    handles
-        .monitoring_section
-        .set_visible(settings.show_monitoring);
+    // Main window theme (and others if we want)
+    apply_theme_fixed(&handles.main_window, &settings.theme);
+    apply_theme_fixed(&handles.terminal_window, &settings.theme);
+    apply_theme_fixed(&handles.monitor_window, &settings.theme);
+    apply_theme_fixed(&handles.shortcuts_window, &settings.theme);
+
+    handles.terminal_window.set_visible(settings.show_terminal);
+    handles.monitor_window.set_visible(settings.show_monitoring);
+    handles.shortcuts_window.set_visible(settings.show_shortcuts_panel);
+    
     handles.monitor_cards.set_visibility(settings);
-    handles
-        .shortcuts_panel
-        .set_revealed(settings.show_shortcuts_panel);
-    handles.window.set_resizable(!settings.lock_size);
+    
+    // Lock size logic might need to change for multiple windows, 
+    // or we just apply it to all.
+    handles.main_window.set_resizable(!settings.lock_size);
+    handles.terminal_window.set_resizable(!settings.lock_size);
+    handles.monitor_window.set_resizable(!settings.lock_size);
+    handles.shortcuts_window.set_resizable(!settings.lock_size);
+
     handles.monitor_cards.set_style(&settings.monitor_style);
+    apply_dynamic_styles(&handles.style_provider, settings);
 }
 
-fn apply_theme(root: &Box, theme: &Theme) {
+fn apply_dynamic_styles(provider: &CssProvider, settings: &Settings) {
+    let gen_css = |selector: &str, style: &crate::settings::SectionStyle| {
+        format!(
+            "{} {{ background-color: {}; opacity: {}; font-size: {}px; border-radius: {}px; }}",
+            selector, style.bg_color, style.opacity, style.font_size, style.border_radius
+        )
+    };
+
+    // Note: We target the specific classes we added.
+    // For opacity, we might need to be careful as it affects children. 
+    // If the user wants background opacity only, we should use rgba in bg_color.
+    // But the requirement says "control opacity", which usually implies the whole widget or background.
+    // Given the glassmorphism, background opacity is usually handled via the color alpha.
+    // If 'opacity' here means the widget opacity, it will fade content too.
+    // Let's assume widget opacity for now as it's requested as a separate control.
+    
+    let css = format!(
+        "{}\n{}\n{}",
+        gen_css(".terminal-section", &settings.terminal_style),
+        gen_css(".monitoring-shell", &settings.monitoring_style),
+        gen_css(".shortcuts-section", &settings.shortcuts_style)
+    );
+
+    provider.load_from_data(&css);
+}
+
+
+
+fn apply_theme_fixed(window: &ApplicationWindow, theme: &Theme) {
     for cls in &[
         "theme-dark",
         "theme-light",
         "theme-solarized",
         "theme-tokyo",
     ] {
-        root.remove_css_class(cls);
+        window.remove_css_class(cls);
     }
     let class_name = match theme {
         Theme::Dark => "theme-dark",
@@ -691,8 +734,7 @@ fn apply_theme(root: &Box, theme: &Theme) {
         Theme::Solarized => "theme-solarized",
         Theme::Tokyo => "theme-tokyo",
     };
-    // TODO(senior-ui): Allow custom accent colors + transparency slider instead of fixed presets.
-    root.add_css_class(class_name);
+    window.add_css_class(class_name);
 }
 
 fn build_header(window: &ApplicationWindow, settings: Rc<RefCell<Settings>>) -> HeaderBar {
@@ -800,9 +842,27 @@ fn build_header(window: &ApplicationWindow, settings: Rc<RefCell<Settings>>) -> 
     }
 }
 
+fn create_standalone_window(app: &Application, title: &str, w: i32, h: i32) -> ApplicationWindow {
+    let window = ApplicationWindow::new(app);
+    window.set_title(Some(title));
+    window.set_default_size(w, h);
+    // window.set_decorated(false); // Optional: decide if we want OS decorations for standalone
+    window.add_css_class("glass-window");
+    
+    // Attempt to detect compositor and apply appropriate classes
+    if let Ok(session_type) = std::env::var("XDG_SESSION_TYPE") {
+        if session_type == "wayland" {
+             window.add_css_class("wayland-glass");
+        } else {
+             window.add_css_class("x11-glass");
+        }
+    }
+    window
+}
+
 fn build_context_menu(handles: UiHandles) {
     let popover = Popover::builder().has_arrow(true).build();
-    popover.set_parent(&handles.window);
+    popover.set_parent(&handles.main_window);
 
     let column = Box::new(Orientation::Vertical, 8);
     column.set_margin_top(10);
@@ -835,7 +895,7 @@ fn build_context_menu(handles: UiHandles) {
     column.append(&opacity_box);
 
     {
-        let win = handles.window.clone();
+        let win = handles.main_window.clone();
         opacity_scale.connect_value_changed(move |scale| {
             win.set_opacity(scale.value());
         });
@@ -856,10 +916,10 @@ fn build_context_menu(handles: UiHandles) {
         pop_clone.set_pointing_to(Some(&gdk::Rectangle::new(x as i32, y as i32, 1, 1)));
         pop_clone.popup();
     });
-    handles.window.add_controller(gesture);
+    handles.main_window.add_controller(gesture);
 
     {
-        let win = handles.window.clone();
+        let win = handles.main_window.clone();
         let pop = popover.clone();
         minimize_btn.connect_clicked(move |_| {
             win.minimize();
@@ -868,7 +928,7 @@ fn build_context_menu(handles: UiHandles) {
     }
 
     {
-        let win = handles.window.clone();
+        let win = handles.main_window.clone();
         close_btn.connect_clicked(move |_| {
             win.close();
         });
@@ -881,7 +941,7 @@ fn build_context_menu(handles: UiHandles) {
             let settings_rc = handles_clone.settings.clone();
             let handles_apply = handles_clone.clone();
             show_settings_window(
-                &handles_clone.window,
+                &handles_clone.main_window,
                 settings_rc,
                 move |updated: Settings| {
                     handles_apply.settings.replace(updated.clone());

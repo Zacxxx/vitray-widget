@@ -100,7 +100,16 @@ fn main() {
         return;
     }
 
-    let app = Application::new(Some("com.moebius.vitray-widget"), Default::default());
+    let app = Application::builder()
+        .application_id("com.moebius.vitray-widget")
+        .build();
+
+    app.connect_startup(|_| {
+        if let Ok(_icon_path) = std::fs::canonicalize("assets/icon.png") {
+             gtk4::Window::set_default_icon_name("vitray-widget");
+        }
+    });
+
     // TODO(senior-ui): Register a single-instance DBus name and raise the existing window when
     // invoked again instead of spawning duplicate widgets.
 

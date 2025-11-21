@@ -128,6 +128,70 @@ pub fn show_settings_window(
     system_expander.set_child(Some(&system_box));
     main_box.append(&system_expander);
 
+    // Styling Tab (Created early to be captured by save closure)
+    let styling_box = Box::new(Orientation::Vertical, 12);
+    styling_box.set_margin_top(16);
+    styling_box.set_margin_bottom(16);
+    styling_box.set_margin_start(16);
+    styling_box.set_margin_end(16);
+    
+    let styling_scroll = gtk4::ScrolledWindow::new();
+    styling_scroll.set_child(Some(&styling_box));
+    styling_scroll.set_vexpand(true);
+
+    // Helper to create section controls
+    let create_section_controls = |title: &str, style: &crate::settings::SectionStyle| {
+        let group = Box::new(Orientation::Vertical, 6);
+        group.append(&Label::new(Some(title)));
+        
+        let grid = gtk4::Grid::new();
+        grid.set_column_spacing(10);
+        grid.set_row_spacing(6);
+        
+        // Opacity
+        grid.attach(&Label::new(Some("Opacity")), 0, 0, 1, 1);
+        let opacity = gtk4::Scale::with_range(Orientation::Horizontal, 0.1, 1.0, 0.05);
+        opacity.set_value(style.opacity);
+        opacity.set_hexpand(true);
+        grid.attach(&opacity, 1, 0, 1, 1);
+        
+        // Color
+        grid.attach(&Label::new(Some("Bg Color")), 0, 1, 1, 1);
+        let color = gtk4::Entry::new();
+        color.set_text(&style.bg_color);
+        grid.attach(&color, 1, 1, 1, 1);
+        
+        // Font Size
+        grid.attach(&Label::new(Some("Font Size")), 0, 2, 1, 1);
+        let font = gtk4::Scale::with_range(Orientation::Horizontal, 8.0, 24.0, 1.0);
+        font.set_value(style.font_size);
+        font.set_hexpand(true);
+        grid.attach(&font, 1, 2, 1, 1);
+
+        // Radius
+        grid.attach(&Label::new(Some("Radius")), 0, 3, 1, 1);
+        let radius = gtk4::Scale::with_range(Orientation::Horizontal, 0.0, 50.0, 1.0);
+        radius.set_value(style.border_radius);
+        radius.set_hexpand(true);
+        grid.attach(&radius, 1, 3, 1, 1);
+        
+        group.append(&grid);
+        group.append(&gtk4::Separator::new(Orientation::Horizontal));
+        (group, opacity, color, font, radius)
+    };
+
+    let (term_box, term_op, term_col, term_font, term_rad) = 
+        create_section_controls("Terminal", &settings_snapshot.terminal_style);
+    styling_box.append(&term_box);
+
+    let (mon_box, mon_op, mon_col, mon_font, mon_rad) = 
+        create_section_controls("Monitoring", &settings_snapshot.monitoring_style);
+    styling_box.append(&mon_box);
+
+    let (sc_box, sc_op, sc_col, sc_font, sc_rad) = 
+        create_section_controls("Shortcuts", &settings_snapshot.shortcuts_style);
+    styling_box.append(&sc_box);
+
     // Save Button
     // TODO(senior-ui): Swap to Apply/Reset buttons with undo to encourage experimentation.
     // Save / Reset Buttons
@@ -184,6 +248,22 @@ pub fn show_settings_window(
         new_settings.lock_in_place = lock_place_box.1.is_active();
         new_settings.lock_size = lock_size_box.1.is_active();
 
+        // Styling
+        new_settings.terminal_style.opacity = term_op.value();
+        new_settings.terminal_style.bg_color = term_col.text().to_string();
+        new_settings.terminal_style.font_size = term_font.value();
+        new_settings.terminal_style.border_radius = term_rad.value();
+
+        new_settings.monitoring_style.opacity = mon_op.value();
+        new_settings.monitoring_style.bg_color = mon_col.text().to_string();
+        new_settings.monitoring_style.font_size = mon_font.value();
+        new_settings.monitoring_style.border_radius = mon_rad.value();
+
+        new_settings.shortcuts_style.opacity = sc_op.value();
+        new_settings.shortcuts_style.bg_color = sc_col.text().to_string();
+        new_settings.shortcuts_style.font_size = sc_font.value();
+        new_settings.shortcuts_style.border_radius = sc_rad.value();
+
         settings.replace(new_settings.clone());
         new_settings.save();
         on_save(new_settings);
@@ -191,6 +271,8 @@ pub fn show_settings_window(
     });
 
     notebook.append_page(&main_box, Some(&Label::new(Some("Controls"))));
+
+    notebook.append_page(&styling_scroll, Some(&Label::new(Some("Styling"))));
 
     // Help tab
     let help_box = Box::new(Orientation::Vertical, 10);

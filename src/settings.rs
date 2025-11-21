@@ -19,6 +19,44 @@ pub enum MonitorStyle {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct SectionStyle {
+    pub opacity: f64,
+    pub bg_color: String, // Hex code, e.g., "#12161e"
+    pub font_size: f64,
+    pub border_radius: f64,
+}
+
+impl Default for SectionStyle {
+    fn default() -> Self {
+        Self {
+            opacity: 0.78,
+            bg_color: "#12161e".to_string(),
+            font_size: 11.0,
+            border_radius: 18.0,
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct WidgetLayout {
+    pub x: f64,
+    pub y: f64,
+    pub width: f64,
+    pub height: f64,
+}
+
+impl Default for WidgetLayout {
+    fn default() -> Self {
+        Self {
+            x: 0.0,
+            y: 0.0,
+            width: 300.0,
+            height: 200.0,
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(default)]
 pub struct Settings {
     // TODO(senior-ui): Persist window geometry, opacity, and monitor affinity to avoid the widget
@@ -35,6 +73,15 @@ pub struct Settings {
     pub launch_at_start: bool,
     pub lock_in_place: bool,
     pub lock_size: bool,
+
+    // New fields for detachable sections
+    pub terminal_style: SectionStyle,
+    pub monitoring_style: SectionStyle,
+    pub shortcuts_style: SectionStyle,
+    
+    pub terminal_layout: WidgetLayout,
+    pub monitoring_layout: WidgetLayout,
+    pub shortcuts_layout: WidgetLayout,
 }
 
 impl Default for Settings {
@@ -52,6 +99,14 @@ impl Default for Settings {
             launch_at_start: false,
             lock_in_place: true,
             lock_size: true,
+
+            terminal_style: SectionStyle::default(),
+            monitoring_style: SectionStyle::default(),
+            shortcuts_style: SectionStyle::default(),
+
+            terminal_layout: WidgetLayout { x: 50.0, y: 50.0, width: 600.0, height: 400.0 },
+            monitoring_layout: WidgetLayout { x: 50.0, y: 470.0, width: 600.0, height: 200.0 },
+            shortcuts_layout: WidgetLayout { x: 670.0, y: 50.0, width: 250.0, height: 620.0 },
         }
     }
 }
