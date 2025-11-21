@@ -32,6 +32,7 @@ pub fn show_settings_window(
 
     // Theme
     let theme_box = Box::new(Orientation::Horizontal, 10);
+    // TODO(senior-ui): Replace the plain combo with swatches + preview so visual changes are obvious.
     theme_box.append(&Label::new(Some("Theme")));
     let theme_combo = ComboBoxText::new();
     theme_combo.append_text("Dark");
@@ -49,6 +50,7 @@ pub fn show_settings_window(
 
     // Monitor style
     let style_box = Box::new(Orientation::Horizontal, 10);
+    // TODO(senior-ui): Provide inline sparkline demos for each monitoring style selection.
     style_box.append(&Label::new(Some("Monitoring style")));
     let style_combo = ComboBoxText::new();
     style_combo.append_text("Just numbers");
@@ -63,6 +65,8 @@ pub fn show_settings_window(
     main_box.append(&style_box);
 
     // Sections
+    // TODO(senior-ui): Group these toggles into collapsible sections so the sheet scales as
+    // advanced modules arrive (notifications, widgets, etc.).
     let terminal_toggle = create_toggle("Show terminal", settings_snapshot.show_terminal);
     let monitoring_toggle = create_toggle("Show monitoring", settings_snapshot.show_monitoring);
     let shortcuts_toggle = create_toggle(
@@ -89,6 +93,7 @@ pub fn show_settings_window(
     main_box.append(&lock_size_box.0);
 
     // Save Button
+    // TODO(senior-ui): Swap to Apply/Reset buttons with undo to encourage experimentation.
     let save_btn = Button::with_label("Save");
     save_btn.add_css_class("pill-btn");
     let window_clone = window.clone();
@@ -153,6 +158,7 @@ pub fn show_settings_window(
          - Run shortcuts: vitray <name>.\n\
          - Toggle themes here or via CSS in src/style.css.",
     );
+    // TODO(senior-ui): Pull help copy from docs/ so we can localize and add imagery per desktop env.
     help_box.append(&help_text);
     notebook.append_page(&help_box, Some(&Label::new(Some("Help"))));
 

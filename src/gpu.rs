@@ -19,7 +19,8 @@ impl GpuMonitor {
             }
         }
 
-        // Could add intel_gpu_top or radeontop parsing here in future
+        // TODO(senior-ui): Extend detection to Intel/AMD stacks (intel_gpu_top, radeontop, vkms)
+        // so GPU cards never show "N/A" on laptops or Wayland setups.
 
         None
     }

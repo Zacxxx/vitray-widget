@@ -38,11 +38,13 @@ impl ShortcutsPanel {
         let list = ListBox::new();
         list.add_css_class("shortcut-list");
         list.set_selection_mode(gtk4::SelectionMode::None);
+        // TODO(senior-ui): Back this list with a GtkFilterListModel so we can offer search + sorting.
         column.append(&list);
 
-        let add_btn = Button::with_label("Create Shortcut");
-        add_btn.add_css_class("pill-btn");
-        column.append(&add_btn);
+    let add_btn = Button::with_label("Create Shortcut");
+    add_btn.add_css_class("pill-btn");
+    // TODO(senior-ui): Promote a floating \"+\" affordance or global hotkey to match user muscle memory.
+    column.append(&add_btn);
 
         revealer.set_child(Some(&column));
 
@@ -104,6 +106,7 @@ fn build_row(panel: ShortcutsPanel, shortcut: Shortcut) -> ListBoxRow {
     command.add_css_class("shortcut-command");
     command.set_halign(Align::Start);
     command.set_wrap(true);
+    // TODO(senior-ui): Convert plain text commands into chips and support copy-to-clipboard actions.
 
     let actions = Box::new(Orientation::Horizontal, 6);
     actions.set_halign(Align::End);
@@ -255,6 +258,7 @@ fn open_editor(panel: &ShortcutsPanel, existing: Option<Shortcut>) {
             let name = name_entry.text().trim().to_string();
             let command = cmd_entry.text().trim().to_string();
             if name.is_empty() || command.is_empty() {
+                // TODO(senior-ui): Provide inline validation + examples instead of silently closing.
                 dialog_clone.close();
                 return;
             }
