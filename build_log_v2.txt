@@ -1,0 +1,64 @@
+   Compiling vitray-widget v0.2.0 (/home/moebius/Desktop/Dev/vitray-widget)
+error[E0432]: unresolved import `crate::gpu`
+ --> src/monitor.rs:2:12
+  |
+2 | use crate::gpu::GpuMonitor;
+  |            ^^^ could not find `gpu` in the crate root
+
+warning: unused import: `std::path::Path`
+ --> src/terminal.rs:4:5
+  |
+4 | use std::path::Path;
+  |     ^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: unused imports: `PopoverMenu`, `ProgressBar`, and `gio`
+ --> src/ui.rs:3:62
+  |
+3 |     Application, ApplicationWindow, Box, Label, Orientation, ProgressBar, CssProvider, 
+  |                                                              ^^^^^^^^^^^
+4 |     Grid, Notebook, GestureClick, PopoverMenu, gio, glib
+  |                                   ^^^^^^^^^^^  ^^^
+
+warning: unused import: `std::path::PathBuf`
+ --> src/settings.rs:3:5
+  |
+3 | use std::path::PathBuf;
+  |     ^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `gtk4::prelude`
+ --> src/terminal.rs:1:5
+  |
+1 | use gtk4::prelude::*;
+  |     ^^^^^^^^^^^^^
+
+warning: unused variable: `settings`
+  --> src/ui.rs:14:9
+   |
+14 |     let settings = Settings::load();
+   |         ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_settings`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+warning: unused variable: `shortcuts`
+  --> src/ui.rs:15:9
+   |
+15 |     let shortcuts = Shortcuts::load();
+   |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_shortcuts`
+
+warning: unused variable: `gesture`
+   --> src/ui.rs:123:35
+    |
+123 |     gesture.connect_pressed(move |gesture, _, _, _| {
+    |                                   ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_gesture`
+
+warning: unused variable: `total`
+   --> src/ui.rs:153:20
+    |
+153 |         let (used, total) = mon.get_ram_usage();
+    |                    ^^^^^ help: if this is intentional, prefix it with an underscore: `_total`
+
+For more information about this error, try `rustc --explain E0432`.
+warning: `vitray-widget` (bin "vitray-widget") generated 8 warnings
+error: could not compile `vitray-widget` (bin "vitray-widget") due to 1 previous error; 8 warnings emitted

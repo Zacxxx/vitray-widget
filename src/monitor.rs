@@ -1,4 +1,5 @@
 use sysinfo::{Networks, System};
+use crate::gpu::GpuMonitor;
 
 pub struct SystemMonitor {
     sys: System,
@@ -35,5 +36,9 @@ impl SystemMonitor {
             tx += data.transmitted();
         }
         (rx, tx)
+    }
+
+    pub fn get_gpu_usage(&self) -> Option<f32> {
+        GpuMonitor::get_usage()
     }
 }

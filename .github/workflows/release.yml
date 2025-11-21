@@ -1,0 +1,140 @@
+name: Release and Deploy APT Repository
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-4-dev libvte-2.91-gtk4-dev pkg-config dpkg-dev
+
+      - name: Setup Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Install cargo-deb
+        run: cargo install cargo-deb
+
+      - name: Build release
+        run: cargo build --release
+
+      - name: Create Debian package
+        run: cargo deb
+
+      - name: Get version
+        id: get_version
+        run: |
+          VERSION=$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Building version: $VERSION"
+
+      - name: Setup APT repository structure
+        run: |
+          mkdir -p debian-repo/pool/main
+          mkdir -p debian-repo/dists/stable/main/binary-amd64
+          cp target/debian/vitray-widget_*.deb debian-repo/pool/main/
+          echo "Repository structure created"
+
+      - name: Generate Packages file
+        run: |
+          cd debian-repo
+          dpkg-scanpackages --arch amd64 pool/ > dists/stable/main/binary-amd64/Packages
+          gzip -k -f dists/stable/main/binary-amd64/Packages
+          echo "Packages file generated"
+
+      - name: Generate Release file
+        run: |
+          cd debian-repo/dists/stable
+          cat > Release <<EOF
+          Origin: Vitray Widget Repository
+          Label: Vitray Widget
+          Suite: stable
+          Codename: stable
+          Version: 1.0
+          Architectures: amd64
+          Components: main
+          Description: Vitray Widget APT Repository
+          Date: $(date -Ru)
+          EOF
+          echo "Release file generated"
+
+      - name: Create repository index page
+        run: |
+          cat > debian-repo/index.html <<'EOF'
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+              <meta charset="UTF-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <title>Vitray Widget APT Repository</title>
+              <style>
+                  body { font-family: system-ui; max-width: 800px; margin: 50px auto; padding: 20px; }
+                  code { background: #f4f4f4; padding: 2px 6px; border-radius: 3px; }
+                  pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 5px; overflow-x: auto; }
+              </style>
+          </head>
+          <body>
+              <h1>🪟 Vitray Widget APT Repository</h1>
+              <p>Glassmorphic desktop widget for system monitoring and terminal access.</p>
+              
+              <h2>Installation</h2>
+              <p>Add the repository and install:</p>
+              <pre><code># Add repository
+          echo "deb [trusted=yes] https://$(echo $GITHUB_REPOSITORY | cut -d'/' -f1).github.io/$(echo $GITHUB_REPOSITORY | cut -d'/' -f2) stable main" | sudo tee /etc/apt/sources.list.d/vitray-widget.list
+
+          # Update and install
+          sudo apt update
+          sudo apt install vitray-widget</code></pre>
+
+              <h2>Updates</h2>
+              <p>Updates will be automatically available via:</p>
+              <pre><code>sudo apt update && sudo apt upgrade</code></pre>
+
+              <h2>Manual Installation</h2>
+              <p>Download the latest .deb package from the <a href="https://github.com/$GITHUB_REPOSITORY/releases">releases page</a>.</p>
+
+              <h2>Repository</h2>
+              <p><a href="https://github.com/$GITHUB_REPOSITORY">GitHub Repository</a></p>
+          </body>
+          </html>
+          EOF
+          echo "Index page created"
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./debian-repo
+          publish_branch: gh-pages
+          force_orphan: true
+          cname: false
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main'
+        with:
+          tag_name: v${{ steps.get_version.outputs.version }}
+          name: Release v${{ steps.get_version.outputs.version }}
+          files: target/debian/vitray-widget_*.deb
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,0 +1,52 @@
+   Compiling vitray-widget v0.2.0 (/home/moebius/Desktop/Dev/vitray-widget)
+error[E0425]: cannot find value `PRIORITY_DEFAULT` in crate `glib`
+   --> src/ui.rs:122:67
+    |
+122 |     let (sender, receiver) = ::glib::MainContext::channel(::glib::PRIORITY_DEFAULT);
+    |                                                                   ^^^^^^^^^^^^^^^^ not found in `glib`
+
+warning: unused import: `std::path::Path`
+ --> src/terminal.rs:4:5
+  |
+4 | use std::path::Path;
+  |     ^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: unused imports: `PopoverMenu`, `ProgressBar`, and `gio`
+ --> src/ui.rs:3:62
+  |
+3 |     Application, ApplicationWindow, Box, Label, Orientation, ProgressBar, CssProvider, 
+  |                                                              ^^^^^^^^^^^
+4 |     Grid, Notebook, GestureClick, PopoverMenu, gio, glib
+  |                                   ^^^^^^^^^^^  ^^^
+
+warning: unused import: `std::path::PathBuf`
+ --> src/settings.rs:3:5
+  |
+3 | use std::path::PathBuf;
+  |     ^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `MonitorStyle`
+ --> src/settings_ui.rs:3:40
+  |
+3 | use crate::settings::{Settings, Theme, MonitorStyle};
+  |                                        ^^^^^^^^^^^^
+
+warning: use of deprecated associated function `glib::main_context_channel::<impl glib::MainContext>::channel`: Use an async channel, from async-channel for example, on the main context using spawn_future_local() instead
+   --> src/ui.rs:122:51
+    |
+122 |     let (sender, receiver) = ::glib::MainContext::channel(::glib::PRIORITY_DEFAULT);
+    |                                                   ^^^^^^^
+    |
+    = note: `#[warn(deprecated)]` on by default
+
+warning: unused import: `gtk4::prelude`
+ --> src/terminal.rs:1:5
+  |
+1 | use gtk4::prelude::*;
+  |     ^^^^^^^^^^^^^
+
+For more information about this error, try `rustc --explain E0425`.
+warning: `vitray-widget` (bin "vitray-widget") generated 6 warnings
+error: could not compile `vitray-widget` (bin "vitray-widget") due to 1 previous error; 6 warnings emitted

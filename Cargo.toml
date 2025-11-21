@@ -1,6 +1,6 @@
 [package]
 name = "vitray-widget"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 description = "A glassmorphic desktop widget for system monitoring and terminal access."
 license = "MIT"
@@ -9,6 +9,12 @@ license = "MIT"
 gtk4 = "0.10"
 vte4 = "0.9"
 sysinfo = "0.30"
+glib = "0.18"
+clap = { version = "4.5", features = ["derive"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+directories = "5.0"
+auto-launch = "0.5"
 
 [package.metadata.deb]
 maintainer = "Moebius <moebius@example.com>"

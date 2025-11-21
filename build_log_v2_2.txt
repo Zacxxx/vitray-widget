@@ -1,0 +1,85 @@
+   Compiling vitray-widget v0.2.0 (/home/moebius/Desktop/Dev/vitray-widget)
+error[E0432]: unresolved import `gtk4::glib::Sender`
+ --> src/shortcuts_ui.rs:4:5
+  |
+4 | use gtk4::glib::Sender;
+  |     ^^^^^^^^^^^^^^^^^^ no `Sender` in the root
+  |
+help: consider importing one of these structs instead
+  |
+4 - use gtk4::glib::Sender;
+4 + use std::sync::mpmc::Sender;
+  |
+4 - use gtk4::glib::Sender;
+4 + use std::sync::mpsc::Sender;
+  |
+
+error[E0425]: cannot find value `PRIORITY_DEFAULT` in crate `glib`
+   --> src/ui.rs:122:63
+    |
+122 |     let (sender, receiver) = glib::MainContext::channel(glib::PRIORITY_DEFAULT);
+    |                                                               ^^^^^^^^^^^^^^^^ not found in `glib`
+
+warning: unused import: `std::path::Path`
+ --> src/terminal.rs:4:5
+  |
+4 | use std::path::Path;
+  |     ^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: unused imports: `PopoverMenu`, `ProgressBar`, and `gio`
+ --> src/ui.rs:3:62
+  |
+3 |     Application, ApplicationWindow, Box, Label, Orientation, ProgressBar, CssProvider, 
+  |                                                              ^^^^^^^^^^^
+4 |     Grid, Notebook, GestureClick, PopoverMenu, gio, glib
+  |                                   ^^^^^^^^^^^  ^^^
+
+warning: unused import: `std::path::PathBuf`
+ --> src/settings.rs:3:5
+  |
+3 | use std::path::PathBuf;
+  |     ^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `MonitorStyle`
+ --> src/settings_ui.rs:3:40
+  |
+3 | use crate::settings::{Settings, Theme, MonitorStyle};
+  |                                        ^^^^^^^^^^^^
+
+error[E0599]: no function or associated item named `channel` found for struct `MainContext` in the current scope
+   --> src/ui.rs:122:49
+    |
+122 |     let (sender, receiver) = glib::MainContext::channel(glib::PRIORITY_DEFAULT);
+    |                                                 ^^^^^^^ function or associated item not found in `MainContext`
+    |
+note: if you're trying to build a new `MainContext` consider using one of the following associated functions:
+      MainContext::new
+      MainContext::default
+      MainContext::thread_default
+      MainContext::ref_thread_default
+   --> /home/moebius/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/glib-0.21.4/src/auto/main_context.rs:23:5
+    |
+ 23 |     pub fn new() -> MainContext {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+126 |     pub fn default() -> MainContext {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+132 |     pub fn thread_default() -> Option<MainContext> {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+144 |     pub fn ref_thread_default() -> MainContext {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `gtk4::prelude`
+ --> src/terminal.rs:1:5
+  |
+1 | use gtk4::prelude::*;
+  |     ^^^^^^^^^^^^^
+
+Some errors have detailed explanations: E0425, E0432, E0599.
+For more information about an error, try `rustc --explain E0425`.
+warning: `vitray-widget` (bin "vitray-widget") generated 5 warnings
+error: could not compile `vitray-widget` (bin "vitray-widget") due to 3 previous errors; 5 warnings emitted
