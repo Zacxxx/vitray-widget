@@ -1,5 +1,5 @@
-use sysinfo::{Networks, System};
 use crate::gpu::GpuMonitor;
+use sysinfo::{Networks, System};
 
 pub struct SystemMonitor {
     sys: System,
