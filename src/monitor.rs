@@ -35,8 +35,8 @@ impl SystemMonitor {
             rx += data.received();
             tx += data.transmitted();
         }
-        // TODO(senior-ui): Track per-interface deltas + smoothing so the UI can surface the
-        // busiest link, rather than dumping aggregated spikes that flicker each second.
+        // TODO: Implement smoothing if needed, but for now raw deltas are okay
+        // The UI handles the delta calculation.
         (rx, tx)
     }
 

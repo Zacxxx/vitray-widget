@@ -24,27 +24,27 @@ enum Trend {
 
 #[derive(Clone)]
 struct PerformanceStrip {
-    cpu: Label,
-    gpu: Label,
-    ram: Label,
-    net: Label,
+    cpu: Button,
+    gpu: Button,
+    ram: Button,
+    net: Button,
 }
 
 impl PerformanceStrip {
     fn new() -> Self {
-        let chip = |text: &str| {
-            let lbl = Label::new(Some(text));
-            lbl.add_css_class("perf-chip");
-            lbl
+        let chip = |text: &str, tooltip: &str| {
+            let btn = Button::with_label(text);
+            btn.add_css_class("perf-chip");
+            btn.add_css_class("flat");
+            btn.set_tooltip_text(Some(tooltip));
+            btn
         };
-        // TODO(senior-ui): Promote chips to interactive pills with tooltips and per-metric settings
-        // (sampling rate, thresholds) instead of static labels.
 
         Self {
-            cpu: chip("CPU —"),
-            gpu: chip("GPU —"),
-            ram: chip("RAM —"),
-            net: chip("NET —"),
+            cpu: chip("CPU —", "CPU Usage\nClick for details"),
+            gpu: chip("GPU —", "GPU Usage\nClick for details"),
+            ram: chip("RAM —", "Memory Usage\nClick for details"),
+            net: chip("NET —", "Network Traffic\nClick for details"),
         }
     }
 
@@ -60,10 +60,10 @@ impl PerformanceStrip {
     }
 
     fn update(&self, cpu: &str, gpu: &str, ram: &str, net: &str) {
-        self.cpu.set_text(cpu);
-        self.gpu.set_text(gpu);
-        self.ram.set_text(ram);
-        self.net.set_text(net);
+        self.cpu.set_label(cpu);
+        self.gpu.set_label(gpu);
+        self.ram.set_label(ram);
+        self.net.set_label(net);
     }
 }
 
@@ -146,21 +146,34 @@ impl MonitorCard {
                 .iter()
                 .cloned()
                 .fold(1.0_f64, |a, b| if b > a { b } else { a });
-            let step = (width.max(1) - 1) as f64 / (data.len() - 1) as f64;
+            let step = width as f64 / (data.len() - 1) as f64;
 
-            cr.set_source_rgba(0.9, 0.95, 1.0, 0.35);
-            cr.set_line_width(2.0);
-
+            // Fill path
+            cr.set_source_rgba(0.2, 0.6, 1.0, 0.15);
+            cr.move_to(0.0, height as f64);
+            
             for (idx, val) in data.iter().enumerate() {
                 let x = idx as f64 * step;
-                let y = height as f64 - ((val / max) * height as f64 * 0.9);
+                let y = height as f64 - ((val / max) * height as f64 * 0.95);
+                cr.line_to(x, y);
+            }
+            cr.line_to(width as f64, height as f64);
+            cr.close_path();
+            let _ = cr.fill();
+
+            // Stroke path
+            cr.set_source_rgba(0.2, 0.6, 1.0, 0.8);
+            cr.set_line_width(2.0);
+            
+            for (idx, val) in data.iter().enumerate() {
+                let x = idx as f64 * step;
+                let y = height as f64 - ((val / max) * height as f64 * 0.95);
                 if idx == 0 {
                     cr.move_to(x, y);
                 } else {
                     cr.line_to(x, y);
                 }
             }
-
             let _ = cr.stroke();
         });
     }
@@ -204,11 +217,17 @@ impl MonitorCard {
         {
             let mut hist = self.history.borrow_mut();
             hist.push(clamped);
-            if hist.len() > 80 {
-                hist.remove(0);
+            
+            // Adaptive history based on width (approx 1px per sample)
+            let width = self.chart.width();
+            let max_samples = if width > 0 { width as usize } else { 120 };
+            
+            if hist.len() > max_samples {
+                let remove_count = hist.len() - max_samples;
+                for _ in 0..remove_count {
+                     hist.remove(0);
+                }
             }
-            // TODO(senior-ui): Make history depth adaptive to window width so charts don't stretch
-            // identical 80 samples regardless of available pixels.
         }
         self.chart.queue_draw();
     }
@@ -284,8 +303,15 @@ pub fn build_ui(app: &Application) {
     window.set_title(Some("Vitray Widget"));
     window.set_default_size(520, 760);
     window.set_decorated(false);
-    // TODO(senior-ui): Detect compositor capabilities and toggle blur/shadows automatically so the
-    // glass effect renders well on Mutter, KWin, and Hyprland.
+    
+    // Attempt to detect compositor and apply appropriate classes
+    if let Ok(session_type) = std::env::var("XDG_SESSION_TYPE") {
+        if session_type == "wayland" {
+             window.add_css_class("wayland-glass");
+        } else {
+             window.add_css_class("x11-glass");
+        }
+    }
     window.add_css_class("glass-window");
     window.set_resizable(!settings.borrow().lock_size);
 
@@ -318,8 +344,13 @@ pub fn build_ui(app: &Application) {
     terminal_header.add_css_class("terminal-header");
     let tabs_btn = Button::with_label("+ Tab");
     tabs_btn.add_css_class("pill-btn");
-    // TODO(senior-ui): Introduce closable, reorderable tabs with status indicators so multiple
-    // sessions stay manageable in tight vertical layouts.
+    
+    // Enable reordering
+    let notebook = Notebook::new();
+    notebook.set_show_tabs(true);
+    notebook.set_scrollable(true);
+    notebook.add_css_class("terminal-notebook");
+    notebook.set_group_name(Some("terminal-tabs"));
     let shortcuts_btn = Button::with_label("Shortcuts");
     shortcuts_btn.add_css_class("pill-btn");
     terminal_header.append(&Label::new(Some("Terminal")));
@@ -327,19 +358,22 @@ pub fn build_ui(app: &Application) {
     terminal_header.append(&shortcuts_btn);
     terminal_header.set_halign(Align::Start);
 
-    let notebook = Notebook::new();
-    notebook.set_show_tabs(true);
-    notebook.set_scrollable(true);
-    notebook.add_css_class("terminal-notebook");
+    // Notebook created above
+    // notebook.set_show_tabs(true); // Already set
+    // notebook.set_scrollable(true); // Already set
     // TODO(senior-ui): Persist tabs + working directories so a reboot restores the same workspace.
 
-    let terminal = create_terminal();
+    let terminal = create_terminal(None, None);
     // TODO(senior-ui): Allow each page to bind to saved shortcuts (Deploy, Monitor) instead of
     // generic names like T1/T2.
     let scrolled = gtk4::ScrolledWindow::new();
     scrolled.set_child(Some(&terminal));
     scrolled.set_vexpand(true);
-    notebook.append_page(&scrolled, Some(&Label::new(Some("T1"))));
+    
+    let tab_label = build_tab_label(&notebook, &scrolled, "T1");
+    notebook.append_page(&scrolled, Some(&tab_label));
+    notebook.set_tab_reorderable(&scrolled, true);
+    notebook.set_tab_detachable(&scrolled, true);
 
     terminal_section.append(&terminal_header);
     terminal_section.append(&notebook);
@@ -503,10 +537,24 @@ pub fn build_ui(app: &Application) {
         };
         last_net = Some((rx_raw, tx_raw));
         let total_speed = (rx_rate + tx_rate) as f64 / 1024.0;
-        // TODO(senior-ui): Show download/upload separately w/ icons + convert to Mbps for >1Gb links.
+        let rx_kb = rx_rate as f64 / 1024.0;
+        let tx_kb = tx_rate as f64 / 1024.0;
+        
+        let rx_display = if rx_kb > 1024.0 {
+            format!("{:.1} MB/s", rx_kb / 1024.0)
+        } else {
+            format!("{:.0} KB/s", rx_kb)
+        };
+        
+        let tx_display = if tx_kb > 1024.0 {
+            format!("{:.1} MB/s", tx_kb / 1024.0)
+        } else {
+            format!("{:.0} KB/s", tx_kb)
+        };
+
         handles.monitor_cards.net.update(
             total_speed.min(2000.0),
-            &format!("{total_speed:.0} KB/s"),
+            &format!("↓{} ↑{}", rx_display, tx_display),
             &style,
         );
 
@@ -525,15 +573,93 @@ pub fn build_ui(app: &Application) {
 }
 
 fn add_terminal_tab(notebook: &Notebook) {
-    let terminal = create_terminal();
+    let terminal = create_terminal(None, None);
     let scrolled = gtk4::ScrolledWindow::new();
     scrolled.set_child(Some(&terminal));
     scrolled.set_vexpand(true);
+    
     let idx = notebook.n_pages() + 1;
-    notebook.append_page(&scrolled, Some(&Label::new(Some(&format!("T{}", idx)))));
-    // TODO(senior-ui): Add inline close buttons + "rename tab" affordance so power users can label
-    // SSH sessions or tasks.
-    notebook.set_current_page(Some(idx as u32));
+    let title = format!("T{}", idx);
+    let tab_label = build_tab_label(notebook, &scrolled, &title);
+    
+    notebook.append_page(&scrolled, Some(&tab_label));
+    notebook.set_tab_reorderable(&scrolled, true);
+    notebook.set_tab_detachable(&scrolled, true);
+    notebook.set_current_page(Some(notebook.n_pages() - 1));
+}
+
+fn build_tab_label(notebook: &Notebook, page: &impl IsA<gtk4::Widget>, title: &str) -> Box {
+    let box_ = Box::new(Orientation::Horizontal, 4);
+    let label = Label::new(Some(title));
+    box_.append(&label);
+    
+    let close_btn = Button::from_icon_name("window-close-symbolic");
+    close_btn.add_css_class("flat");
+    close_btn.add_css_class("small-icon");
+    box_.append(&close_btn);
+    
+    let notebook_clone = notebook.clone();
+    let page_clone = page.clone();
+    close_btn.connect_clicked(move |_| {
+        if let Some(idx) = notebook_clone.page_num(&page_clone) {
+            notebook_clone.remove_page(Some(idx));
+        }
+    });
+    
+    // Rename on double click
+    let gesture = GestureClick::new();
+    gesture.set_button(1);
+    let label_clone = label.clone();
+    let parent_win = notebook.root().and_then(|r| r.downcast::<gtk4::Window>().ok());
+    
+    gesture.connect_pressed(move |_gesture, n_press, _, _| {
+        if n_press == 2 {
+            // Simple rename dialog
+            if let Some(win) = &parent_win {
+                prompt_rename(win, &label_clone);
+            }
+        }
+    });
+    box_.add_controller(gesture);
+    
+    box_
+}
+
+fn prompt_rename(parent: &gtk4::Window, label: &Label) {
+    let dialog = gtk4::Dialog::builder()
+        .transient_for(parent)
+        .modal(true)
+        .title("Rename Tab")
+        .build();
+        
+    let entry = gtk4::Entry::new();
+    entry.set_text(&label.text());
+    entry.set_activates_default(true);
+    
+    let content = dialog.content_area();
+    content.set_margin_top(10);
+    content.set_margin_bottom(10);
+    content.set_margin_start(10);
+    content.set_margin_end(10);
+    content.set_spacing(10);
+    content.append(&entry);
+    
+    let btn = dialog.add_button("Rename", gtk4::ResponseType::Ok);
+    btn.add_css_class("suggested-action");
+    dialog.set_default_response(gtk4::ResponseType::Ok);
+    
+    let label_clone = label.clone();
+    dialog.connect_response(move |d, resp| {
+        if resp == gtk4::ResponseType::Ok {
+            let text = entry.text();
+            if !text.is_empty() {
+                label_clone.set_text(&text);
+            }
+        }
+        d.close();
+    });
+    
+    dialog.show();
 }
 
 fn apply_settings(handles: &UiHandles, settings: &Settings) {
@@ -575,7 +701,19 @@ fn build_header(window: &ApplicationWindow, settings: Rc<RefCell<Settings>>) -> 
 
     let title = Label::new(Some("Vitray"));
     title.add_css_class("title");
-    // TODO(senior-ui): Inject workspace name/time widgets here so the header does more than branding.
+    
+    let time_label = Label::new(None);
+    time_label.add_css_class("header-time");
+    
+    // Update time every second
+    glib::timeout_add_seconds_local(1, {
+        let label = time_label.clone();
+        move || {
+            let now = glib::DateTime::now_local().unwrap();
+            label.set_text(&now.format("%H:%M").unwrap().to_string());
+            glib::ControlFlow::Continue
+        }
+    });
 
     let spacer = Box::new(Orientation::Horizontal, 6);
     spacer.set_hexpand(true);
@@ -597,6 +735,7 @@ fn build_header(window: &ApplicationWindow, settings: Rc<RefCell<Settings>>) -> 
     close_btn.add_css_class("icon-btn");
 
     header.append(&title);
+    header.append(&time_label);
     header.append(&spacer);
     header.append(&shortcuts_btn);
     header.append(&settings_btn);
@@ -686,7 +825,21 @@ fn build_context_menu(handles: UiHandles) {
     let shortcuts_toggle = gtk4::CheckButton::with_label("Toggle shortcuts panel");
     shortcuts_toggle.set_active(handles.settings.borrow().show_shortcuts_panel);
     column.append(&shortcuts_toggle);
-    // TODO(senior-ui): Expand context menu with opacity slider + monitor picker for multi-head rigs.
+
+    let opacity_box = Box::new(Orientation::Vertical, 4);
+    opacity_box.append(&Label::new(Some("Opacity")));
+    let opacity_scale = gtk4::Scale::with_range(Orientation::Horizontal, 0.1, 1.0, 0.05);
+    opacity_scale.set_value(1.0); // Default, TODO: bind to settings
+    opacity_scale.set_draw_value(true);
+    opacity_box.append(&opacity_scale);
+    column.append(&opacity_box);
+
+    {
+        let win = handles.window.clone();
+        opacity_scale.connect_value_changed(move |scale| {
+            win.set_opacity(scale.value());
+        });
+    }
 
     let minimize_btn = Button::with_label("Minimize");
     let close_btn = Button::with_label("Close");

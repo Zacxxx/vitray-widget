@@ -35,15 +35,39 @@ impl ShortcutsPanel {
         title.set_halign(Align::Start);
         column.append(&title);
 
+        let search_entry = gtk4::SearchEntry::new();
+        search_entry.set_placeholder_text(Some("Search shortcuts..."));
+        column.append(&search_entry);
+
         let list = ListBox::new();
         list.add_css_class("shortcut-list");
         list.set_selection_mode(gtk4::SelectionMode::None);
-        // TODO(senior-ui): Back this list with a GtkFilterListModel so we can offer search + sorting.
+        
+        // Filter list based on search
+        let list_clone = list.clone();
+        search_entry.connect_search_changed(move |entry| {
+            let query = entry.text().to_lowercase();
+            let mut child = list_clone.first_child();
+            while let Some(row) = child {
+                if let Ok(row_widget) = row.clone().downcast::<ListBoxRow>() {
+                     if let Some(label) = row_widget.child().and_then(|c| c.downcast::<Overlay>().ok())
+                        .and_then(|o| o.child())
+                        .and_then(|c| c.downcast::<Box>().ok())
+                        .and_then(|b| b.first_child())
+                        .and_then(|c| c.downcast::<Label>().ok()) {
+                            let text = label.text().to_lowercase();
+                            row_widget.set_visible(text.contains(&query));
+                     }
+                }
+                child = row.next_sibling();
+            }
+        });
+
         column.append(&list);
 
-    let add_btn = Button::with_label("Create Shortcut");
+    let add_btn = Button::with_label("+ New Shortcut");
     add_btn.add_css_class("pill-btn");
-    // TODO(senior-ui): Promote a floating \"+\" affordance or global hotkey to match user muscle memory.
+    add_btn.add_css_class("suggested-action");
     column.append(&add_btn);
 
         revealer.set_child(Some(&column));
@@ -102,11 +126,25 @@ fn build_row(panel: ShortcutsPanel, shortcut: Shortcut) -> ListBoxRow {
     title.add_css_class("shortcut-title");
     title.set_halign(Align::Start);
 
-    let command = Label::new(Some(&shortcut.command));
-    command.add_css_class("shortcut-command");
-    command.set_halign(Align::Start);
-    command.set_wrap(true);
-    // TODO(senior-ui): Convert plain text commands into chips and support copy-to-clipboard actions.
+    let command_box = Box::new(Orientation::Horizontal, 4);
+    let cmd_chip = Label::new(Some(&shortcut.command));
+    cmd_chip.add_css_class("command-chip");
+    cmd_chip.set_ellipsize(gtk4::pango::EllipsizeMode::End);
+    command_box.append(&cmd_chip);
+    
+    let copy_btn = Button::from_icon_name("edit-copy-symbolic");
+    copy_btn.add_css_class("flat");
+    copy_btn.add_css_class("small-icon");
+    copy_btn.set_tooltip_text(Some("Copy command"));
+    
+    let cmd_text = shortcut.command.clone();
+    copy_btn.connect_clicked(move |_| {
+        let clipboard = gtk4::gdk::Display::default().unwrap().clipboard();
+        clipboard.set(&cmd_text);
+    });
+    command_box.append(&copy_btn);
+    
+    command_box.set_halign(Align::Start);
 
     let actions = Box::new(Orientation::Horizontal, 6);
     actions.set_halign(Align::End);
@@ -127,7 +165,8 @@ fn build_row(panel: ShortcutsPanel, shortcut: Shortcut) -> ListBoxRow {
     actions.append(&delete_btn);
 
     content.append(&title);
-    content.append(&command);
+    content.append(&title);
+    content.append(&command_box);
     content.append(&actions);
 
     overlay.set_child(Some(&content));
@@ -257,25 +296,36 @@ fn open_editor(panel: &ShortcutsPanel, existing: Option<Shortcut>) {
         save.connect_clicked(move |_| {
             let name = name_entry.text().trim().to_string();
             let command = cmd_entry.text().trim().to_string();
+            
             if name.is_empty() || command.is_empty() {
-                // TODO(senior-ui): Provide inline validation + examples instead of silently closing.
-                dialog_clone.close();
+                name_entry.add_css_class("error");
+                cmd_entry.add_css_class("error");
                 return;
             }
 
-            if let Some(old) = &original {
+            let result = if let Some(old) = &original {
                 panel_clone
                     .data
                     .borrow_mut()
-                    .rename(old, name.clone(), command.clone());
+                    .rename(old, name.clone(), command.clone())
             } else {
                 panel_clone
                     .data
                     .borrow_mut()
-                    .upsert(name.clone(), command.clone());
+                    .add(name.clone(), command.clone())
+            };
+            
+            match result {
+                Ok(_) => {
+                    panel_clone.refresh();
+                    dialog_clone.close();
+                }
+                Err(e) => {
+                    // Show error in placeholder or tooltip
+                    name_entry.add_css_class("error");
+                    name_entry.set_tooltip_text(Some(&e));
+                }
             }
-            panel_clone.refresh();
-            dialog_clone.close();
         });
     }
 

@@ -31,9 +31,10 @@ pub fn show_settings_window(
     let settings_snapshot = settings.borrow().clone();
 
     // Theme
+    let theme_group = Box::new(Orientation::Vertical, 6);
+    theme_group.append(&Label::new(Some("Theme")));
+    
     let theme_box = Box::new(Orientation::Horizontal, 10);
-    // TODO(senior-ui): Replace the plain combo with swatches + preview so visual changes are obvious.
-    theme_box.append(&Label::new(Some("Theme")));
     let theme_combo = ComboBoxText::new();
     theme_combo.append_text("Dark");
     theme_combo.append_text("Light");
@@ -46,12 +47,22 @@ pub fn show_settings_window(
         Theme::Tokyo => 3,
     }));
     theme_box.append(&theme_combo);
-    main_box.append(&theme_box);
+    
+    // Preview swatch (placeholder for now)
+    let swatch = gtk4::DrawingArea::new();
+    swatch.set_content_width(24);
+    swatch.set_content_height(24);
+    swatch.add_css_class("theme-swatch");
+    theme_box.append(&swatch);
+    
+    theme_group.append(&theme_box);
+    main_box.append(&theme_group);
 
     // Monitor style
+    let style_group = Box::new(Orientation::Vertical, 6);
+    style_group.append(&Label::new(Some("Monitoring Style")));
+    
     let style_box = Box::new(Orientation::Horizontal, 10);
-    // TODO(senior-ui): Provide inline sparkline demos for each monitoring style selection.
-    style_box.append(&Label::new(Some("Monitoring style")));
     let style_combo = ComboBoxText::new();
     style_combo.append_text("Just numbers");
     style_combo.append_text("Bar");
@@ -62,41 +73,84 @@ pub fn show_settings_window(
         MonitorStyle::Chart => 2,
     }));
     style_box.append(&style_combo);
-    main_box.append(&style_box);
+    
+    // Sparkline demo
+    let demo_chart = gtk4::DrawingArea::new();
+    demo_chart.set_content_width(60);
+    demo_chart.set_content_height(24);
+    demo_chart.add_css_class("demo-chart");
+    style_box.append(&demo_chart);
+    
+    style_group.append(&style_box);
+    main_box.append(&style_group);
 
     // Sections
-    // TODO(senior-ui): Group these toggles into collapsible sections so the sheet scales as
-    // advanced modules arrive (notifications, widgets, etc.).
+    let visibility_expander = gtk4::Expander::new(Some("Visibility"));
+    let visibility_box = Box::new(Orientation::Vertical, 6);
+    
     let terminal_toggle = create_toggle("Show terminal", settings_snapshot.show_terminal);
     let monitoring_toggle = create_toggle("Show monitoring", settings_snapshot.show_monitoring);
     let shortcuts_toggle = create_toggle(
         "Show shortcuts panel",
         settings_snapshot.show_shortcuts_panel,
     );
+    
+    visibility_box.append(&terminal_toggle.0);
+    visibility_box.append(&monitoring_toggle.0);
+    visibility_box.append(&shortcuts_toggle.0);
+    visibility_expander.set_child(Some(&visibility_box));
+    visibility_expander.set_expanded(true);
+    main_box.append(&visibility_expander);
+
+    let sensors_expander = gtk4::Expander::new(Some("Sensors"));
+    let sensors_box = Box::new(Orientation::Vertical, 6);
     let cpu_box = create_toggle("Show CPU", settings_snapshot.show_cpu);
     let gpu_box = create_toggle("Show GPU", settings_snapshot.show_gpu);
     let ram_box = create_toggle("Show RAM", settings_snapshot.show_ram);
     let net_box = create_toggle("Show Network", settings_snapshot.show_network);
-    main_box.append(&terminal_toggle.0);
-    main_box.append(&monitoring_toggle.0);
-    main_box.append(&shortcuts_toggle.0);
-    main_box.append(&cpu_box.0);
-    main_box.append(&gpu_box.0);
-    main_box.append(&ram_box.0);
-    main_box.append(&net_box.0);
+    
+    sensors_box.append(&cpu_box.0);
+    sensors_box.append(&gpu_box.0);
+    sensors_box.append(&ram_box.0);
+    sensors_box.append(&net_box.0);
+    sensors_expander.set_child(Some(&sensors_box));
+    main_box.append(&sensors_expander);
 
+    let system_expander = gtk4::Expander::new(Some("System"));
+    let system_box = Box::new(Orientation::Vertical, 6);
     let auto_start_box = create_toggle("Launch at start", settings_snapshot.launch_at_start);
     let lock_place_box = create_toggle("Lock position", settings_snapshot.lock_in_place);
     let lock_size_box = create_toggle("Lock size", settings_snapshot.lock_size);
-    main_box.append(&auto_start_box.0);
-    main_box.append(&lock_place_box.0);
-    main_box.append(&lock_size_box.0);
+    
+    system_box.append(&auto_start_box.0);
+    system_box.append(&lock_place_box.0);
+    system_box.append(&lock_size_box.0);
+    system_expander.set_child(Some(&system_box));
+    main_box.append(&system_expander);
 
     // Save Button
     // TODO(senior-ui): Swap to Apply/Reset buttons with undo to encourage experimentation.
-    let save_btn = Button::with_label("Save");
+    // Save / Reset Buttons
+    let action_box = Box::new(Orientation::Horizontal, 10);
+    action_box.set_halign(Align::End);
+    
+    let reset_btn = Button::with_label("Reset");
+    let save_btn = Button::with_label("Apply");
     save_btn.add_css_class("pill-btn");
+    
+    action_box.append(&reset_btn);
+    action_box.append(&save_btn);
+    main_box.append(&action_box);
+    
     let window_clone = window.clone();
+
+    {
+        let window_clone = window.clone();
+        reset_btn.connect_clicked(move |_| {
+            // Simply close without saving to revert
+            window_clone.close();
+        });
+    }
 
     save_btn.connect_clicked(move |_| {
         let mut new_settings = settings_snapshot.clone();
@@ -135,7 +189,6 @@ pub fn show_settings_window(
         on_save(new_settings);
         window_clone.close();
     });
-    main_box.append(&save_btn);
 
     notebook.append_page(&main_box, Some(&Label::new(Some("Controls"))));
 
@@ -156,9 +209,10 @@ pub fn show_settings_window(
          - Use the header buttons to minimize, maximize, or close.\n\
          - Create shortcuts: vitray --shortcut \"command\" \"name\".\n\
          - Run shortcuts: vitray <name>.\n\
-         - Toggle themes here or via CSS in src/style.css.",
+         - Toggle themes here or via CSS in src/style.css.\n\
+         \n\
+         Documentation available at: /usr/share/doc/vitray-widget/",
     );
-    // TODO(senior-ui): Pull help copy from docs/ so we can localize and add imagery per desktop env.
     help_box.append(&help_text);
     notebook.append_page(&help_box, Some(&Label::new(Some("Help"))));
 

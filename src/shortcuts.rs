@@ -6,6 +6,15 @@ use std::fs;
 pub struct Shortcut {
     pub name: String,
     pub command: String,
+    #[serde(default = "default_timestamp")]
+    pub created_at: u64,
+}
+
+fn default_timestamp() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs()
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
@@ -42,10 +51,20 @@ impl Shortcuts {
         }
     }
 
-    pub fn add(&mut self, name: String, command: String) {
-        // TODO(senior-ui): Enforce unique, slug-safe names so the CLI/GUI stay in sync.
-        self.items.push(Shortcut { name, command });
+    pub fn add(&mut self, name: String, command: String) -> Result<(), String> {
+        // Enforce unique, slug-safe names
+        let slug = name.trim().replace(" ", "-").to_lowercase();
+        if self.items.iter().any(|s| s.name.to_lowercase() == slug) {
+            return Err(format!("Shortcut '{}' already exists", slug));
+        }
+        
+        self.items.push(Shortcut { 
+            name: slug, 
+            command,
+            created_at: default_timestamp(),
+        });
         self.save();
+        Ok(())
     }
 
     pub fn remove_by_name(&mut self, name: &str) -> bool {
@@ -57,25 +76,21 @@ impl Shortcuts {
         false
     }
 
-    pub fn upsert(&mut self, name: String, command: String) {
-        // TODO(senior-ui): Track created/updated timestamps for ordering + telemetry.
-        if let Some(existing) = self.items.iter_mut().find(|s| s.name == name) {
-            existing.command = command;
-        } else {
-            self.items.push(Shortcut { name, command });
-        }
-        self.save();
-    }
 
-    pub fn rename(&mut self, old_name: &str, new_name: String, command: String) -> bool {
+
+    pub fn rename(&mut self, old_name: &str, new_name: String, command: String) -> Result<(), String> {
+        // Check if new name conflicts (unless it's the same name)
+        if old_name != new_name && self.items.iter().any(|s| s.name == new_name) {
+             return Err(format!("Shortcut '{}' already exists", new_name));
+        }
+
         if let Some(existing) = self.items.iter_mut().find(|s| s.name == old_name) {
             existing.name = new_name;
             existing.command = command;
             self.save();
-            return true;
+            return Ok(());
         }
-        // TODO(senior-ui): Bubble an error to the UI when rename fails so users get actionable feedback.
-        false
+        Err("Shortcut not found".to_string())
     }
 
     pub fn find(&self, name: &str) -> Option<Shortcut> {

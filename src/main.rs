@@ -52,8 +52,10 @@ fn main() {
             let command = &shortcut_args[0];
             let name = &shortcut_args[1];
             let mut shortcuts = Shortcuts::load();
-            shortcuts.add(name.clone(), command.clone());
-            println!("Shortcut '{}' added for command '{}'", name, command);
+            match shortcuts.add(name.clone(), command.clone()) {
+                Ok(_) => println!("Shortcut '{}' added for command '{}'", name, command),
+                Err(e) => eprintln!("Error adding shortcut: {}", e),
+            }
             return;
         }
     }
