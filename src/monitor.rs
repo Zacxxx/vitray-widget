@@ -1,5 +1,5 @@
 use crate::gpu::GpuMonitor;
-use glib;
+
 use std::thread;
 use std::time::Duration;
 use sysinfo::{Networks, System};
@@ -55,15 +55,15 @@ impl SystemMonitor {
     }
 }
 
-pub fn start_monitoring_service() -> glib::Receiver<MonitorData> {
-    let (sender, receiver) = glib::MainContext::channel(glib::Priority::DEFAULT);
+pub fn start_monitoring_service() -> async_channel::Receiver<MonitorData> {
+    let (sender, receiver) = async_channel::unbounded();
 
     thread::spawn(move || {
         smol::block_on(async {
             let mut monitor = SystemMonitor::new();
             loop {
                 let data = monitor.refresh();
-                if sender.send(data).is_err() {
+                if sender.send(data).await.is_err() {
                     break; // Channel closed
                 }
                 smol::Timer::after(Duration::from_secs(1)).await;

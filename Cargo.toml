@@ -17,6 +17,7 @@ auto-launch = "0.5"
 font-kit = "0.14.3"
 smol = "2.0.2"
 glib = "0.21"
+async-channel = "2.5.0"
 
 [package.metadata.deb]
 maintainer = "Moebius <moebius@example.com>"

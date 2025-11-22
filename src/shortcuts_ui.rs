@@ -1,4 +1,4 @@
-use glib::Sender;
+use async_channel::Sender;
 use gtk4::prelude::*;
 use gtk4::{
     Align, ApplicationWindow, Box, Button, Dialog, Entry, Label, ListBox, ListBoxRow, Orientation,
@@ -111,7 +111,7 @@ impl ShortcutsPanel {
     }
 
     pub fn run_shortcut(&self, command: String) {
-        let _ = self.sender.send(command);
+        let _ = self.sender.try_send(command);
     }
 }
 

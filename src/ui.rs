@@ -7,7 +7,6 @@ use gtk4::{
 use std::{cell::RefCell, rc::Rc};
 use vte4::TerminalExt;
 
-use crate::monitor::MonitorData;
 use crate::settings::{MonitorStyle, Settings, Theme};
 use crate::settings_ui::show_settings_window;
 use crate::shortcuts::Shortcuts;
@@ -330,8 +329,7 @@ pub fn build_ui(app: &Application) {
 
 
     // --- Terminal channel ---
-    #[allow(deprecated)]
-    let (sender, receiver) = glib::MainContext::channel(glib::Priority::DEFAULT);
+    let (sender, receiver) = async_channel::unbounded::<String>();
 
 
     // --- Header & Perf Strip (Main Window Content) ---
@@ -365,12 +363,14 @@ pub fn build_ui(app: &Application) {
     terminal_header.append(&shortcuts_btn);
     terminal_header.set_halign(Align::Start);
 
-    let terminal = create_terminal(None, None);
+    // Initial tab
+    let shell = settings.borrow().shell.clone();
+    let terminal = create_terminal(&shell, None, None);
     let scrolled = gtk4::ScrolledWindow::new();
     scrolled.set_child(Some(&terminal));
     scrolled.set_vexpand(true);
     
-    let tab_label = build_tab_label(&notebook, &scrolled, "T1");
+    let tab_label = build_tab_label(&notebook, &scrolled, "Terminal");
     notebook.append_page(&scrolled, Some(&tab_label));
     notebook.set_tab_reorderable(&scrolled, true);
     notebook.set_tab_detachable(&scrolled, true);
@@ -419,15 +419,20 @@ pub fn build_ui(app: &Application) {
 
 
     // Terminal channel feed
-    receiver.attach(None, move |cmd: String| {
-        let cmd_with_newline = format!("{}\n", cmd);
-        terminal.feed_child(cmd_with_newline.as_bytes());
-        glib::ControlFlow::Continue
+    glib::MainContext::default().spawn_local(async move {
+        while let Ok(cmd) = receiver.recv().await {
+            let cmd_with_newline = format!("{}\n", cmd);
+            terminal.feed_child(cmd_with_newline.as_bytes());
+        }
     });
 
     {
         let notebook_clone = notebook.clone();
-        tabs_btn.connect_clicked(move |_| add_terminal_tab(&notebook_clone));
+        let settings_clone = settings.clone();
+        tabs_btn.connect_clicked(move |_| {
+            let shell = settings_clone.borrow().shell.clone();
+            add_terminal_tab(&notebook_clone, &shell);
+        });
     }
 
     {
@@ -494,88 +499,92 @@ pub fn build_ui(app: &Application) {
     let monitor_receiver = crate::monitor::start_monitoring_service();
     let mut last_net: Option<(u64, u64)> = None;
 
-    monitor_receiver.attach(None, move |data| {
-        let active_settings = handles.settings.borrow().clone();
-        let style = active_settings.monitor_style.clone();
+    let handles_weak = handles.clone(); // Actually we need strong reference or weak? 
+    // spawn_local keeps the future alive. We need to move handles in.
+    // But handles is Clone.
+    
+    glib::MainContext::default().spawn_local(async move {
+        while let Ok(data) = monitor_receiver.recv().await {
+            let active_settings = handles_weak.settings.borrow().clone();
+            let style = active_settings.monitor_style.clone();
 
-        let cpu = data.cpu_usage as f64;
-        handles
-            .monitor_cards
-            .cpu
-            .update(cpu, &format!("{cpu:.0}%"), &style);
-
-        let gpu_usage = data.gpu_usage;
-        if let Some(gpu) = gpu_usage {
-            handles
+            let cpu = data.cpu_usage as f64;
+            handles_weak
                 .monitor_cards
-                .gpu
-                .update(gpu as f64, &format!("{gpu:.0}%"), &style);
-        } else {
-            handles.monitor_cards.gpu.update(0.0, "N/A", &style);
+                .cpu
+                .update(cpu, &format!("{cpu:.0}%"), &style);
+
+            let gpu_usage = data.gpu_usage;
+            if let Some(gpu) = gpu_usage {
+                handles_weak
+                    .monitor_cards
+                    .gpu
+                    .update(gpu as f64, &format!("{gpu:.0}%"), &style);
+            } else {
+                handles_weak.monitor_cards.gpu.update(0.0, "N/A", &style);
+            }
+
+            let (used, total) = (data.ram_used, data.ram_total);
+            let used_gb = used as f64 / 1024.0 / 1024.0 / 1024.0;
+            let total_gb = total as f64 / 1024.0 / 1024.0 / 1024.0;
+            let ram_pct = if total > 0 {
+                used as f64 / total as f64 * 100.0
+            } else {
+                0.0
+            };
+            handles_weak.monitor_cards.ram.update(
+                ram_pct,
+                &format!("{used_gb:.1}/{total_gb:.1} GB"),
+                &style,
+            );
+
+            let (rx_raw, tx_raw) = (data.rx_bytes, data.tx_bytes);
+            let (rx_rate, tx_rate) = if let Some((prev_rx, prev_tx)) = last_net {
+                (
+                    rx_raw.saturating_sub(prev_rx),
+                    tx_raw.saturating_sub(prev_tx),
+                )
+            } else {
+                (0, 0)
+            };
+            last_net = Some((rx_raw, tx_raw));
+            let total_speed = (rx_rate + tx_rate) as f64 / 1024.0;
+            let rx_kb = rx_rate as f64 / 1024.0;
+            let tx_kb = tx_rate as f64 / 1024.0;
+            
+            let rx_display = if rx_kb > 1024.0 {
+                format!("{:.1} MB/s", rx_kb / 1024.0)
+            } else {
+                format!("{:.0} KB/s", rx_kb)
+            };
+            
+            let tx_display = if tx_kb > 1024.0 {
+                format!("{:.1} MB/s", tx_kb / 1024.0)
+            } else {
+                format!("{:.0} KB/s", tx_kb)
+            };
+
+            handles_weak.monitor_cards.net.update(
+                total_speed.min(2000.0),
+                &format!("↓{} ↑{}", rx_display, tx_display),
+                &style,
+            );
+
+            let gpu_label = gpu_usage.map(|gpu| format!("GPU {:.0}%", gpu));
+            let net_label = format!("NET {total_speed:.0} KB/s");
+
+            handles_weak.performance_strip.update(
+                &format!("CPU {cpu:.0}%"),
+                gpu_label.as_deref().unwrap_or("GPU —"),
+                &format!("RAM {ram_pct:.0}%"),
+                &net_label,
+            );
         }
-
-        let (used, total) = (data.ram_used, data.ram_total);
-        let used_gb = used as f64 / 1024.0 / 1024.0 / 1024.0;
-        let total_gb = total as f64 / 1024.0 / 1024.0 / 1024.0;
-        let ram_pct = if total > 0 {
-            used as f64 / total as f64 * 100.0
-        } else {
-            0.0
-        };
-        handles.monitor_cards.ram.update(
-            ram_pct,
-            &format!("{used_gb:.1}/{total_gb:.1} GB"),
-            &style,
-        );
-
-        let (rx_raw, tx_raw) = (data.rx_bytes, data.tx_bytes);
-        let (rx_rate, tx_rate) = if let Some((prev_rx, prev_tx)) = last_net {
-            (
-                rx_raw.saturating_sub(prev_rx),
-                tx_raw.saturating_sub(prev_tx),
-            )
-        } else {
-            (0, 0)
-        };
-        last_net = Some((rx_raw, tx_raw));
-        let total_speed = (rx_rate + tx_rate) as f64 / 1024.0;
-        let rx_kb = rx_rate as f64 / 1024.0;
-        let tx_kb = tx_rate as f64 / 1024.0;
-        
-        let rx_display = if rx_kb > 1024.0 {
-            format!("{:.1} MB/s", rx_kb / 1024.0)
-        } else {
-            format!("{:.0} KB/s", rx_kb)
-        };
-        
-        let tx_display = if tx_kb > 1024.0 {
-            format!("{:.1} MB/s", tx_kb / 1024.0)
-        } else {
-            format!("{:.0} KB/s", tx_kb)
-        };
-
-        handles.monitor_cards.net.update(
-            total_speed.min(2000.0),
-            &format!("↓{} ↑{}", rx_display, tx_display),
-            &style,
-        );
-
-        let gpu_label = gpu_usage.map(|gpu| format!("GPU {:.0}%", gpu));
-        let net_label = format!("NET {total_speed:.0} KB/s");
-
-        handles.performance_strip.update(
-            &format!("CPU {cpu:.0}%"),
-            gpu_label.as_deref().unwrap_or("GPU —"),
-            &format!("RAM {ram_pct:.0}%"),
-            &net_label,
-        );
-
-        glib::ControlFlow::Continue
     });
 }
 
-fn add_terminal_tab(notebook: &Notebook) {
-    let terminal = create_terminal(None, None);
+fn add_terminal_tab(notebook: &Notebook, shell: &str) {
+    let terminal = create_terminal(shell, None, None);
     let scrolled = gtk4::ScrolledWindow::new();
     scrolled.set_child(Some(&terminal));
     scrolled.set_vexpand(true);

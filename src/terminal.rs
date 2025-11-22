@@ -2,12 +2,11 @@ use gtk4::prelude::*;
 use gtk4::{gio, glib};
 use vte4::{PtyFlags, Terminal, TerminalExtManual};
 
-pub fn create_terminal(cwd: Option<&str>, env: Option<&[(&str, &str)]>) -> Terminal {
+pub fn create_terminal(shell: &str, cwd: Option<&str>, env: Option<&[(&str, &str)]>) -> Terminal {
     let terminal = Terminal::new();
     terminal.add_css_class("glass-terminal");
 
-    let shell = std::env::var("SHELL").unwrap_or("/bin/bash".to_string());
-    let command = [shell.as_str()];
+    let command = [shell];
 
     let env_vars: Vec<String> = if let Some(vars) = env {
         vars.iter().map(|(k, v)| format!("{}={}", k, v)).collect()

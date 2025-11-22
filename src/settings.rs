@@ -80,6 +80,8 @@ pub struct Settings {
     pub launch_at_start: bool,
     pub lock_in_place: bool,
     pub lock_size: bool,
+    #[serde(default = "default_shell")]
+    pub shell: String,
 
     // New fields for detachable sections
     pub terminal_style: SectionStyle,
@@ -89,6 +91,10 @@ pub struct Settings {
     pub terminal_layout: WidgetLayout,
     pub monitoring_layout: WidgetLayout,
     pub shortcuts_layout: WidgetLayout,
+}
+
+fn default_shell() -> String {
+    std::env::var("SHELL").unwrap_or("/bin/bash".to_string())
 }
 
 impl Default for Settings {
@@ -106,6 +112,7 @@ impl Default for Settings {
             launch_at_start: false,
             lock_in_place: true,
             lock_size: true,
+            shell: default_shell(),
 
             terminal_style: SectionStyle {
                 font_family: "Monospace".to_string(),

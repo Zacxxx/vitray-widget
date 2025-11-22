@@ -122,9 +122,17 @@ pub fn show_settings_window(
     let lock_place_box = create_toggle("Lock position", settings_snapshot.lock_in_place);
     let lock_size_box = create_toggle("Lock size", settings_snapshot.lock_size);
     
+    let shell_box = Box::new(Orientation::Horizontal, 10);
+    shell_box.append(&Label::new(Some("Shell")));
+    let shell_entry = gtk4::Entry::new();
+    shell_entry.set_text(&settings_snapshot.shell);
+    shell_entry.set_hexpand(true);
+    shell_box.append(&shell_entry);
+
     system_box.append(&auto_start_box.0);
     system_box.append(&lock_place_box.0);
     system_box.append(&lock_size_box.0);
+    system_box.append(&shell_box);
     system_expander.set_child(Some(&system_box));
     main_box.append(&system_expander);
 
@@ -291,6 +299,7 @@ fn get_system_fonts() -> Vec<String> {
 
         new_settings.lock_in_place = lock_place_box.1.is_active();
         new_settings.lock_size = lock_size_box.1.is_active();
+        new_settings.shell = shell_entry.text().to_string();
 
         // Styling
         new_settings.terminal_style.opacity = term_op.value();
