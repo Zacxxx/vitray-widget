@@ -1,0 +1,9 @@
+Origin: Vitray Widget Repository
+Label: Vitray Widget
+Suite: stable
+Codename: stable
+Version: 1.0
+Architectures: amd64
+Components: main
+Description: Vitray Widget APT Repository
+Date: Sat, 22 Nov 2025 17:41:30 +0000

@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vitray Widget APT Repository</title>
+    <style>
+        body { font-family: system-ui; max-width: 800px; margin: 50px auto; padding: 20px; }
+        code { background: #f4f4f4; padding: 2px 6px; border-radius: 3px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 5px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>🪟 Vitray Widget APT Repository</h1>
+    <p>Glassmorphic desktop widget for system monitoring and terminal access.</p>
+    
+    <h2>Installation</h2>
+    <p>Add the repository and install:</p>
+    <pre><code># Add repository
+echo "deb [trusted=yes] https://$(echo $GITHUB_REPOSITORY | cut -d'/' -f1).github.io/$(echo $GITHUB_REPOSITORY | cut -d'/' -f2) stable main" | sudo tee /etc/apt/sources.list.d/vitray-widget.list
+
+# Update and install
+sudo apt update
+sudo apt install vitray-widget</code></pre>
+
+    <h2>Updates</h2>
+    <p>Updates will be automatically available via:</p>
+    <pre><code>sudo apt update && sudo apt upgrade</code></pre>
+
+    <h2>Manual Installation</h2>
+    <p>Download the latest .deb package from the <a href="https://github.com/$GITHUB_REPOSITORY/releases">releases page</a>.</p>
+
+    <h2>Repository</h2>
+    <p><a href="https://github.com/$GITHUB_REPOSITORY">GitHub Repository</a></p>
+</body>
+</html>
