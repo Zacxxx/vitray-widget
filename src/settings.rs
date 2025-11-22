@@ -1,4 +1,3 @@
-use auto_launch;
 use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -65,6 +64,7 @@ impl Default for WidgetLayout {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(default)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct Settings {
     // TODO(senior-ui): Persist window geometry, opacity, and monitor affinity to avoid the widget
     // jumping between workspaces each launch.
@@ -94,7 +94,7 @@ pub struct Settings {
 }
 
 fn default_shell() -> String {
-    std::env::var("SHELL").unwrap_or("/bin/bash".to_string())
+    std::env::var("SHELL").unwrap_or_else(|_| "/bin/bash".to_string())
 }
 
 impl Default for Settings {

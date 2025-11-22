@@ -29,3 +29,24 @@ assets = [
     ["assets/icon.png", "usr/share/icons/hicolor/512x512/apps/vitray-widget.png", "644"],
     ["src/style.css", "usr/share/vitray-widget/style.css", "644"],
 ]
+
+[lints.rust]
+unsafe_code = "forbid"
+missing_docs = "warn"
+unused_qualifications = "warn"
+
+[lints.clippy]
+pedantic = "warn"
+nursery = "warn"
+perf = "warn"
+style = "warn"
+complexity = "warn"
+suspicious = "warn"
+correctness = "warn"
+unwrap_used = "warn"
+expect_used = "warn"
+panic = "warn"
+todo = "warn"
+unimplemented = "warn"
+dbg_macro = "warn"
+print_stdout = "warn"

@@ -5,7 +5,9 @@ use gtk4::{
 use std::{cell::RefCell, rc::Rc};
 
 use crate::settings::{MonitorStyle, Settings, Theme};
+use font_kit::source::SystemSource;
 
+#[allow(clippy::too_many_lines)]
 pub fn show_settings_window(
     parent: &impl IsA<Window>,
     settings: Rc<RefCell<Settings>>,
@@ -147,14 +149,9 @@ pub fn show_settings_window(
     styling_scroll.set_child(Some(&styling_box));
     styling_scroll.set_vexpand(true);
 
-use font_kit::source::SystemSource;
-
 fn get_system_fonts() -> Vec<String> {
     let source = SystemSource::new();
-    let mut families = match source.all_families() {
-        Ok(f) => f,
-        Err(_) => vec!["Sans".to_string(), "Monospace".to_string()],
-    };
+    let mut families = source.all_families().unwrap_or_else(|_| vec!["Sans".to_string(), "Monospace".to_string()]);
     families.sort();
     families.dedup();
     families
@@ -199,7 +196,7 @@ fn get_system_fonts() -> Vec<String> {
         for (i, family) in fonts.iter().enumerate() {
             font_combo.append_text(family);
             if family == current_font {
-                active_id = i as u32;
+                active_id = u32::try_from(i).unwrap_or(0);
             }
         }
         // If current font not found, add it (custom or fallback)
@@ -212,7 +209,7 @@ fn get_system_fonts() -> Vec<String> {
         // Better way: set active by ID if we used IDs, but here we just rely on index matching sorted list
         // Re-check active
         if let Some(idx) = fonts.iter().position(|f| f == current_font) {
-            font_combo.set_active(Some(idx as u32));
+            font_combo.set_active(Some(u32::try_from(idx).unwrap_or(0)));
         } else {
              // Add as custom option? Or just select first.
              font_combo.set_active(Some(0));
@@ -273,10 +270,10 @@ fn get_system_fonts() -> Vec<String> {
 
         // Theme
         new_settings.theme = match theme_combo.active().unwrap_or(0) {
-            0 => Theme::Dark,
+            #[allow(clippy::match_same_arms)]
+            0 | 3 => Theme::Dark, // Default to Dark for 0 and fallback
             1 => Theme::Light,
             2 => Theme::Solarized,
-            3 => Theme::Tokyo,
             _ => Theme::Dark,
         };
 
@@ -305,19 +302,19 @@ fn get_system_fonts() -> Vec<String> {
         new_settings.terminal_style.opacity = term_op.value();
         new_settings.terminal_style.bg_color = term_col.text().to_string();
         new_settings.terminal_style.font_size = term_size.value();
-        new_settings.terminal_style.font_family = term_font.active_text().unwrap_or("Monospace".into()).to_string();
+        new_settings.terminal_style.font_family = term_font.active_text().unwrap_or_else(|| "Monospace".into()).to_string();
         new_settings.terminal_style.border_radius = term_rad.value();
 
         new_settings.monitoring_style.opacity = mon_op.value();
         new_settings.monitoring_style.bg_color = mon_col.text().to_string();
         new_settings.monitoring_style.font_size = mon_size.value();
-        new_settings.monitoring_style.font_family = mon_font.active_text().unwrap_or("Sans".into()).to_string();
+        new_settings.monitoring_style.font_family = mon_font.active_text().unwrap_or_else(|| "Sans".into()).to_string();
         new_settings.monitoring_style.border_radius = mon_rad.value();
 
         new_settings.shortcuts_style.opacity = sc_op.value();
         new_settings.shortcuts_style.bg_color = sc_col.text().to_string();
         new_settings.shortcuts_style.font_size = sc_size.value();
-        new_settings.shortcuts_style.font_family = sc_font.active_text().unwrap_or("Sans".into()).to_string();
+        new_settings.shortcuts_style.font_family = sc_font.active_text().unwrap_or_else(|| "Sans".into()).to_string();
         new_settings.shortcuts_style.border_radius = sc_rad.value();
 
         settings.replace(new_settings.clone());

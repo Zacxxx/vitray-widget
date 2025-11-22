@@ -8,12 +8,10 @@ pub fn create_terminal(shell: &str, cwd: Option<&str>, env: Option<&[(&str, &str
 
     let command = [shell];
 
-    let env_vars: Vec<String> = if let Some(vars) = env {
-        vars.iter().map(|(k, v)| format!("{}={}", k, v)).collect()
-    } else {
-        Vec::new()
-    };
-    let env_ptrs: Vec<&str> = env_vars.iter().map(|s| s.as_str()).collect();
+    let env_vars: Vec<String> = env.map_or_else(Vec::new, |vars| {
+        vars.iter().map(|(k, v)| format!("{k}={v}")).collect()
+    });
+    let env_ptrs: Vec<&str> = env_vars.iter().map(String::as_str).collect();
 
     terminal.spawn_async(
         PtyFlags::DEFAULT,

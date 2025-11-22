@@ -6,7 +6,7 @@ impl GpuMonitor {
     pub fn get_usage() -> Option<f32> {
         // Try nvidia-smi first
         if let Ok(output) = Command::new("nvidia-smi")
-            .args(&[
+            .args([
                 "--query-gpu=utilization.gpu",
                 "--format=csv,noheader,nounits",
             ])

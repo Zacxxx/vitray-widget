@@ -94,10 +94,7 @@ impl ShortcutsPanel {
         self.revealer.set_reveal_child(show);
     }
 
-    pub fn toggle(&self) {
-        self.revealer
-            .set_reveal_child(!self.revealer.reveals_child());
-    }
+
 
     pub fn refresh(&self) {
         while let Some(child) = self.list.first_child() {
@@ -139,8 +136,9 @@ fn build_row(panel: ShortcutsPanel, shortcut: Shortcut) -> ListBoxRow {
     
     let cmd_text = shortcut.command.clone();
     copy_btn.connect_clicked(move |_| {
-        let clipboard = gtk4::gdk::Display::default().unwrap().clipboard();
-        clipboard.set(&cmd_text);
+        if let Some(display) = gtk4::gdk::Display::default() {
+            display.clipboard().set(&cmd_text);
+        }
     });
     command_box.append(&copy_btn);
     
@@ -189,7 +187,7 @@ fn build_row(panel: ShortcutsPanel, shortcut: Shortcut) -> ListBoxRow {
     }
 
     {
-        let panel_clone = panel.clone();
+        let panel_clone = panel;
         delete_btn.connect_clicked(move |btn| {
             let popover = build_delete_popover(&panel_clone, shortcut_name.clone(), btn);
             popover.popup();
@@ -247,8 +245,7 @@ fn open_editor(panel: &ShortcutsPanel, existing: Option<Shortcut>) {
         .title(
             existing
                 .as_ref()
-                .map(|_| "Edit Shortcut")
-                .unwrap_or("Add Shortcut"),
+                .map_or("Add Shortcut", |_| "Edit Shortcut"),
         )
         .build();
     dialog.set_default_size(360, 180);
@@ -307,16 +304,16 @@ fn open_editor(panel: &ShortcutsPanel, existing: Option<Shortcut>) {
                 panel_clone
                     .data
                     .borrow_mut()
-                    .rename(old, name.clone(), command.clone())
+                    .rename(old, name, command)
             } else {
                 panel_clone
                     .data
                     .borrow_mut()
-                    .add(name.clone(), command.clone())
+                    .add(&name, command)
             };
             
             match result {
-                Ok(_) => {
+                Ok(()) => {
                     panel_clone.refresh();
                     dialog_clone.close();
                 }
