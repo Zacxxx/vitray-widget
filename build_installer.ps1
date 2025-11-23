@@ -55,7 +55,8 @@ else {
     # cargo-wix default: <Component Id="binary0" Guid="..."> <File Id="exe0" ... /> </Component>
     # We want to insert before </Component>
     
-    $Pattern = "(<File Id='exe0'.*?/>)"
+    # Use (?s) for single-line mode (dot matches newline) to handle multi-line File tags
+    $Pattern = "(?s)(<File Id='exe0'.*?/>)"
     if ($Content -match $Pattern) {
         $Replacement = "$1`n$DllXml"
         $NewContent = $Content -replace $Pattern, $Replacement
@@ -69,7 +70,8 @@ else {
 
 # 4. Build MSI
 Write-Host "Building MSI..."
-cargo wix -v
+# Add --nocapture to see rustc output if it fails
+cargo wix -v --nocapture
 
 # 5. Verify
 $TargetWix = Join-Path $Root "target\wix"
