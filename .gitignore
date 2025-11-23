@@ -1,1 +1,6 @@
 /target
+/deps
+/release_bundle
+*.msi
+*.wixobj
+*.wixpdb
