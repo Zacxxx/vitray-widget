@@ -5,6 +5,7 @@ use gtk4::{
     GestureClick, Grid, Label, LevelBar, Notebook, Orientation, Popover, Stack, StackTransitionType,
 };
 use std::{cell::RefCell, rc::Rc};
+#[cfg(target_os = "linux")]
 use vte4::TerminalExt;
 
 use crate::settings::{MonitorStyle, Settings, Theme};
@@ -291,7 +292,10 @@ pub fn build_ui(app: &Application) {
     if std::path::Path::new("src/style.css").exists() {
         provider.load_from_path("src/style.css");
     } else {
-        provider.load_from_path("/usr/share/vitray-widget/style.css");
+        let asset_path = crate::platform::get_asset_path().join("style.css");
+        if let Some(path_str) = asset_path.to_str() {
+            provider.load_from_path(path_str);
+        }
     }
 
     if let Some(display) = gdk::Display::default() {

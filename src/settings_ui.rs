@@ -338,7 +338,7 @@ fn get_system_fonts() -> Vec<String> {
     help_text.set_editable(false);
     help_text.set_wrap_mode(gtk4::WrapMode::Word);
     help_text.add_css_class("help-text");
-    help_text.buffer().set_text(
+    help_text.buffer().set_text(&format!(
         "Tips:\n\
          - Right click the widget for quick actions.\n\
          - Use the header buttons to minimize, maximize, or close.\n\
@@ -346,8 +346,9 @@ fn get_system_fonts() -> Vec<String> {
          - Run shortcuts: vitray <name>.\n\
          - Toggle themes here or via CSS in src/style.css.\n\
          \n\
-         Documentation available at: /usr/share/doc/vitray-widget/",
-    );
+         Documentation available at: {}",
+        crate::platform::get_doc_path()
+    ));
     help_box.append(&help_text);
     notebook.append_page(&help_box, Some(&Label::new(Some("Help"))));
 

@@ -11,6 +11,7 @@ use std::process::Command;
 
 mod gpu;
 mod monitor;
+mod platform;
 mod settings;
 mod settings_ui;
 mod shortcuts;
@@ -92,7 +93,7 @@ fn main() {
         let shortcuts = Shortcuts::load();
         if let Some(shortcut) = shortcuts.find(&name) {
             println!("→ Running {} :: {}", shortcut.name, shortcut.command);
-            let _ = Command::new("bash")
+            let _ = Command::new(crate::platform::get_default_shell())
                 .arg("-c")
                 .arg(shortcut.command)
                 .status();

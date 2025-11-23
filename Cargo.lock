@@ -1566,6 +1566,7 @@ dependencies = [
  "smol",
  "sysinfo",
  "vte4",
+ "winres",
 ]
 
 [[package]]
