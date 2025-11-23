@@ -5,8 +5,7 @@ use gtk4::{
     GestureClick, Grid, Label, LevelBar, Notebook, Orientation, Popover, Stack, StackTransitionType,
 };
 use std::{cell::RefCell, rc::Rc};
-#[cfg(target_os = "linux")]
-use vte4::TerminalExt;
+
 
 use crate::settings::{MonitorStyle, Settings, Theme};
 use crate::settings_ui::show_settings_window;
@@ -375,7 +374,7 @@ pub fn build_ui(app: &Application) {
     let shell = settings.borrow().shell.clone();
     let terminal = create_terminal(&shell, None, None);
     let scrolled = gtk4::ScrolledWindow::new();
-    scrolled.set_child(Some(&terminal));
+    scrolled.set_child(Some(terminal.widget()));
     scrolled.set_vexpand(true);
     
     let tab_label = build_tab_label(&notebook, &scrolled, "Terminal");
@@ -600,7 +599,7 @@ pub fn build_ui(app: &Application) {
 fn add_terminal_tab(notebook: &Notebook, shell: &str) {
     let terminal = create_terminal(shell, None, None);
     let scrolled = gtk4::ScrolledWindow::new();
-    scrolled.set_child(Some(&terminal));
+    scrolled.set_child(Some(terminal.widget()));
     scrolled.set_vexpand(true);
     
     let idx = notebook.n_pages() + 1;
