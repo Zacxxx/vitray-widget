@@ -5,7 +5,9 @@ use gtk4::{
 use std::{cell::RefCell, rc::Rc};
 
 use crate::settings::{MonitorStyle, Settings, Theme};
+use font_kit::source::SystemSource;
 
+#[allow(clippy::too_many_lines)]
 pub fn show_settings_window(
     parent: &impl IsA<Window>,
     settings: Rc<RefCell<Settings>>,
@@ -122,9 +124,17 @@ pub fn show_settings_window(
     let lock_place_box = create_toggle("Lock position", settings_snapshot.lock_in_place);
     let lock_size_box = create_toggle("Lock size", settings_snapshot.lock_size);
     
+    let shell_box = Box::new(Orientation::Horizontal, 10);
+    shell_box.append(&Label::new(Some("Shell")));
+    let shell_entry = gtk4::Entry::new();
+    shell_entry.set_text(&settings_snapshot.shell);
+    shell_entry.set_hexpand(true);
+    shell_box.append(&shell_entry);
+
     system_box.append(&auto_start_box.0);
     system_box.append(&lock_place_box.0);
     system_box.append(&lock_size_box.0);
+    system_box.append(&shell_box);
     system_expander.set_child(Some(&system_box));
     main_box.append(&system_expander);
 
@@ -139,7 +149,16 @@ pub fn show_settings_window(
     styling_scroll.set_child(Some(&styling_box));
     styling_scroll.set_vexpand(true);
 
+fn get_system_fonts() -> Vec<String> {
+    let source = SystemSource::new();
+    let mut families = source.all_families().unwrap_or_else(|_| vec!["Sans".to_string(), "Monospace".to_string()]);
+    families.sort();
+    families.dedup();
+    families
+}
+
     // Helper to create section controls
+    let fonts = get_system_fonts();
     let create_section_controls = |title: &str, style: &crate::settings::SectionStyle| {
         let group = Box::new(Orientation::Vertical, 6);
         group.append(&Label::new(Some(title)));
@@ -163,32 +182,62 @@ pub fn show_settings_window(
         
         // Font Size
         grid.attach(&Label::new(Some("Font Size")), 0, 2, 1, 1);
-        let font = gtk4::Scale::with_range(Orientation::Horizontal, 8.0, 24.0, 1.0);
-        font.set_value(style.font_size);
-        font.set_hexpand(true);
-        grid.attach(&font, 1, 2, 1, 1);
+        let font_size = gtk4::Scale::with_range(Orientation::Horizontal, 8.0, 24.0, 1.0);
+        font_size.set_value(style.font_size);
+        font_size.set_hexpand(true);
+        grid.attach(&font_size, 1, 2, 1, 1);
+
+        // Font Family
+        grid.attach(&Label::new(Some("Font Family")), 0, 3, 1, 1);
+        let font_combo = ComboBoxText::new();
+        let current_font = &style.font_family;
+        let mut active_id = 0;
+        
+        for (i, family) in fonts.iter().enumerate() {
+            font_combo.append_text(family);
+            if family == current_font {
+                active_id = u32::try_from(i).unwrap_or(0);
+            }
+        }
+        // If current font not found, add it (custom or fallback)
+        if font_combo.active_text().as_deref() != Some(current_font) {
+             // Try to find it again by text, if not found, maybe it's not in the list?
+             // For simplicity, just select the one we found or 0
+             font_combo.set_active(Some(active_id));
+        }
+        
+        // Better way: set active by ID if we used IDs, but here we just rely on index matching sorted list
+        // Re-check active
+        if let Some(idx) = fonts.iter().position(|f| f == current_font) {
+            font_combo.set_active(Some(u32::try_from(idx).unwrap_or(0)));
+        } else {
+             // Add as custom option? Or just select first.
+             font_combo.set_active(Some(0));
+        }
+        font_combo.set_hexpand(true);
+        grid.attach(&font_combo, 1, 3, 1, 1);
 
         // Radius
-        grid.attach(&Label::new(Some("Radius")), 0, 3, 1, 1);
+        grid.attach(&Label::new(Some("Radius")), 0, 4, 1, 1);
         let radius = gtk4::Scale::with_range(Orientation::Horizontal, 0.0, 50.0, 1.0);
         radius.set_value(style.border_radius);
         radius.set_hexpand(true);
-        grid.attach(&radius, 1, 3, 1, 1);
+        grid.attach(&radius, 1, 4, 1, 1);
         
         group.append(&grid);
         group.append(&gtk4::Separator::new(Orientation::Horizontal));
-        (group, opacity, color, font, radius)
+        (group, opacity, color, font_size, font_combo, radius)
     };
 
-    let (term_box, term_op, term_col, term_font, term_rad) = 
+    let (term_box, term_op, term_col, term_size, term_font, term_rad) = 
         create_section_controls("Terminal", &settings_snapshot.terminal_style);
     styling_box.append(&term_box);
 
-    let (mon_box, mon_op, mon_col, mon_font, mon_rad) = 
+    let (mon_box, mon_op, mon_col, mon_size, mon_font, mon_rad) = 
         create_section_controls("Monitoring", &settings_snapshot.monitoring_style);
     styling_box.append(&mon_box);
 
-    let (sc_box, sc_op, sc_col, sc_font, sc_rad) = 
+    let (sc_box, sc_op, sc_col, sc_size, sc_font, sc_rad) = 
         create_section_controls("Shortcuts", &settings_snapshot.shortcuts_style);
     styling_box.append(&sc_box);
 
@@ -221,10 +270,10 @@ pub fn show_settings_window(
 
         // Theme
         new_settings.theme = match theme_combo.active().unwrap_or(0) {
-            0 => Theme::Dark,
+            #[allow(clippy::match_same_arms)]
+            0 | 3 => Theme::Dark, // Default to Dark for 0 and fallback
             1 => Theme::Light,
             2 => Theme::Solarized,
-            3 => Theme::Tokyo,
             _ => Theme::Dark,
         };
 
@@ -247,21 +296,25 @@ pub fn show_settings_window(
 
         new_settings.lock_in_place = lock_place_box.1.is_active();
         new_settings.lock_size = lock_size_box.1.is_active();
+        new_settings.shell = shell_entry.text().to_string();
 
         // Styling
         new_settings.terminal_style.opacity = term_op.value();
         new_settings.terminal_style.bg_color = term_col.text().to_string();
-        new_settings.terminal_style.font_size = term_font.value();
+        new_settings.terminal_style.font_size = term_size.value();
+        new_settings.terminal_style.font_family = term_font.active_text().unwrap_or_else(|| "Monospace".into()).to_string();
         new_settings.terminal_style.border_radius = term_rad.value();
 
         new_settings.monitoring_style.opacity = mon_op.value();
         new_settings.monitoring_style.bg_color = mon_col.text().to_string();
-        new_settings.monitoring_style.font_size = mon_font.value();
+        new_settings.monitoring_style.font_size = mon_size.value();
+        new_settings.monitoring_style.font_family = mon_font.active_text().unwrap_or_else(|| "Sans".into()).to_string();
         new_settings.monitoring_style.border_radius = mon_rad.value();
 
         new_settings.shortcuts_style.opacity = sc_op.value();
         new_settings.shortcuts_style.bg_color = sc_col.text().to_string();
-        new_settings.shortcuts_style.font_size = sc_font.value();
+        new_settings.shortcuts_style.font_size = sc_size.value();
+        new_settings.shortcuts_style.font_family = sc_font.active_text().unwrap_or_else(|| "Sans".into()).to_string();
         new_settings.shortcuts_style.border_radius = sc_rad.value();
 
         settings.replace(new_settings.clone());
@@ -285,7 +338,7 @@ pub fn show_settings_window(
     help_text.set_editable(false);
     help_text.set_wrap_mode(gtk4::WrapMode::Word);
     help_text.add_css_class("help-text");
-    help_text.buffer().set_text(
+    help_text.buffer().set_text(&format!(
         "Tips:\n\
          - Right click the widget for quick actions.\n\
          - Use the header buttons to minimize, maximize, or close.\n\
@@ -293,8 +346,9 @@ pub fn show_settings_window(
          - Run shortcuts: vitray <name>.\n\
          - Toggle themes here or via CSS in src/style.css.\n\
          \n\
-         Documentation available at: /usr/share/doc/vitray-widget/",
-    );
+         Documentation available at: {}",
+        crate::platform::get_doc_path()
+    ));
     help_box.append(&help_text);
     notebook.append_page(&help_box, Some(&Label::new(Some("Help"))));
 

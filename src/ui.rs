@@ -5,9 +5,9 @@ use gtk4::{
     GestureClick, Grid, Label, LevelBar, Notebook, Orientation, Popover, Stack, StackTransitionType,
 };
 use std::{cell::RefCell, rc::Rc};
+#[cfg(target_os = "linux")]
 use vte4::TerminalExt;
 
-use crate::monitor::SystemMonitor;
 use crate::settings::{MonitorStyle, Settings, Theme};
 use crate::settings_ui::show_settings_window;
 use crate::shortcuts::Shortcuts;
@@ -136,6 +136,8 @@ impl MonitorCard {
     fn install_chart_drawer(&self) {
         let hist = self.history.clone();
         self.chart.set_draw_func(move |_area, cr, width, height| {
+            #[allow(clippy::cast_precision_loss)]
+            {
             let data = hist.borrow();
             if data.len() < 2 {
                 return;
@@ -143,20 +145,20 @@ impl MonitorCard {
 
             let max = data
                 .iter()
-                .cloned()
+                .copied()
                 .fold(1.0_f64, |a, b| if b > a { b } else { a });
-            let step = width as f64 / (data.len() - 1) as f64;
+            let step = f64::from(width) / (data.len() - 1) as f64;
 
             // Fill path
             cr.set_source_rgba(0.2, 0.6, 1.0, 0.15);
-            cr.move_to(0.0, height as f64);
+            cr.move_to(0.0, f64::from(height));
             
             for (idx, val) in data.iter().enumerate() {
                 let x = idx as f64 * step;
-                let y = height as f64 - ((val / max) * height as f64 * 0.95);
+                let y = ((val / max) * f64::from(height)).mul_add(-0.95, f64::from(height));
                 cr.line_to(x, y);
             }
-            cr.line_to(width as f64, height as f64);
+            cr.line_to(f64::from(width), f64::from(height));
             cr.close_path();
             let _ = cr.fill();
 
@@ -166,12 +168,13 @@ impl MonitorCard {
             
             for (idx, val) in data.iter().enumerate() {
                 let x = idx as f64 * step;
-                let y = height as f64 - ((val / max) * height as f64 * 0.95);
+                let y = ((val / max) * f64::from(height)).mul_add(-0.95, f64::from(height));
                 if idx == 0 {
                     cr.move_to(x, y);
                 } else {
                     cr.line_to(x, y);
                 }
+            }
             }
             let _ = cr.stroke();
         });
@@ -219,7 +222,7 @@ impl MonitorCard {
             
             // Adaptive history based on width (approx 1px per sample)
             let width = self.chart.width();
-            let max_samples = if width > 0 { width as usize } else { 120 };
+            let max_samples = if width > 0 { width.try_into().unwrap_or(120) } else { 120 };
             
             if hist.len() > max_samples {
                 let remove_count = hist.len() - max_samples;
@@ -268,7 +271,7 @@ struct UiHandles {
     shortcuts_window: ApplicationWindow,
     monitor_cards: MonitorGroup,
     performance_strip: PerformanceStrip,
-    shortcuts_panel: ShortcutsPanel,
+    _shortcuts_panel: ShortcutsPanel,
     settings: Rc<RefCell<Settings>>,
     style_provider: CssProvider,
 }
@@ -280,6 +283,7 @@ struct HeaderBar {
     shortcuts_btn: Button,
 }
 
+#[allow(clippy::too_many_lines)]
 pub fn build_ui(app: &Application) {
     let settings = Rc::new(RefCell::new(Settings::load()));
     let _shortcuts = Shortcuts::load();
@@ -288,10 +292,13 @@ pub fn build_ui(app: &Application) {
     if std::path::Path::new("src/style.css").exists() {
         provider.load_from_path("src/style.css");
     } else {
-        provider.load_from_path("/usr/share/vitray-widget/style.css");
+        let asset_path = crate::platform::get_asset_path().join("style.css");
+        if let Some(path_str) = asset_path.to_str() {
+            provider.load_from_path(path_str);
+        }
     }
 
-    if let Some(display) = gtk4::gdk::Display::default() {
+    if let Some(display) = gdk::Display::default() {
         gtk4::style_context_add_provider_for_display(
             &display,
             &provider,
@@ -301,7 +308,7 @@ pub fn build_ui(app: &Application) {
 
     // Dynamic style provider for user settings
     let dynamic_provider = CssProvider::new();
-    if let Some(display) = gtk4::gdk::Display::default() {
+    if let Some(display) = gdk::Display::default() {
         gtk4::style_context_add_provider_for_display(
             &display,
             &dynamic_provider,
@@ -330,8 +337,7 @@ pub fn build_ui(app: &Application) {
 
 
     // --- Terminal channel ---
-    #[allow(deprecated)]
-    let (sender, receiver) = ::glib::MainContext::channel(::glib::Priority::DEFAULT);
+    let (sender, receiver) = async_channel::unbounded::<String>();
 
 
     // --- Header & Perf Strip (Main Window Content) ---
@@ -365,12 +371,14 @@ pub fn build_ui(app: &Application) {
     terminal_header.append(&shortcuts_btn);
     terminal_header.set_halign(Align::Start);
 
-    let terminal = create_terminal(None, None);
+    // Initial tab
+    let shell = settings.borrow().shell.clone();
+    let terminal = create_terminal(&shell, None, None);
     let scrolled = gtk4::ScrolledWindow::new();
     scrolled.set_child(Some(&terminal));
     scrolled.set_vexpand(true);
     
-    let tab_label = build_tab_label(&notebook, &scrolled, "T1");
+    let tab_label = build_tab_label(&notebook, &scrolled, "Terminal");
     notebook.append_page(&scrolled, Some(&tab_label));
     notebook.set_tab_reorderable(&scrolled, true);
     notebook.set_tab_detachable(&scrolled, true);
@@ -408,7 +416,7 @@ pub fn build_ui(app: &Application) {
     monitor_window.set_child(Some(&monitoring_section));
 
     // --- Shortcuts Content ---
-    let shortcuts_panel = ShortcutsPanel::new(&main_window, sender.clone());
+    let shortcuts_panel = ShortcutsPanel::new(&main_window, sender);
     shortcuts_panel.set_revealed(true); // Always visible in its own window
     
     let shortcuts_wrapper = Box::new(Orientation::Vertical, 0);
@@ -419,15 +427,23 @@ pub fn build_ui(app: &Application) {
 
 
     // Terminal channel feed
-    receiver.attach(None, move |cmd: String| {
-        let cmd_with_newline = format!("{}\n", cmd);
-        terminal.feed_child(cmd_with_newline.as_bytes());
-        ::glib::ControlFlow::Continue
+    glib::MainContext::default().spawn_local(async move {
+        while let Ok(cmd) = receiver.recv().await {
+            let cmd_with_newline = format!("{cmd}\n");
+            #[cfg(target_os = "linux")]
+            if let Ok(term) = terminal.downcast_ref::<vte4::Terminal>() {
+                term.feed_child(cmd_with_newline.as_bytes());
+            }
+        }
     });
 
     {
-        let notebook_clone = notebook.clone();
-        tabs_btn.connect_clicked(move |_| add_terminal_tab(&notebook_clone));
+        let notebook_clone = notebook;
+        let settings_clone = settings.clone();
+        tabs_btn.connect_clicked(move |_| {
+            let shell = settings_clone.borrow().shell.clone();
+            add_terminal_tab(&notebook_clone, &shell);
+        });
     }
 
     {
@@ -443,12 +459,12 @@ pub fn build_ui(app: &Application) {
 
     let handles = UiHandles {
         main_window: main_window.clone(),
-        terminal_window: terminal_window.clone(),
-        monitor_window: monitor_window.clone(),
-        shortcuts_window: shortcuts_window.clone(),
-        monitor_cards: monitor_cards.clone(),
-        performance_strip: performance_strip.clone(),
-        shortcuts_panel: shortcuts_panel.clone(),
+        terminal_window,
+        monitor_window,
+        shortcuts_window,
+        monitor_cards,
+        performance_strip,
+        _shortcuts_panel: shortcuts_panel,
         settings: settings.clone(),
         style_provider: dynamic_provider,
     };
@@ -490,101 +506,108 @@ pub fn build_ui(app: &Application) {
     main_window.present();
 
 
-    // --- Update Loop ---
-    let monitor = Rc::new(RefCell::new(SystemMonitor::new()));
+    // --- Update Loop (Async) ---
+    let monitor_receiver = crate::monitor::start_monitoring_service();
     let mut last_net: Option<(u64, u64)> = None;
 
-    glib::timeout_add_seconds_local(1, move || {
-        let mut mon = monitor.borrow_mut();
-        mon.refresh();
-        let active_settings = handles.settings.borrow().clone();
-        let style = active_settings.monitor_style.clone();
+    let handles_weak = handles; // Actually we need strong reference or weak? 
+    // spawn_local keeps the future alive. We need to move handles in.
+    // But handles is Clone.
+    
+    glib::MainContext::default().spawn_local(async move {
+        while let Ok(data) = monitor_receiver.recv().await {
+            let active_settings = handles_weak.settings.borrow().clone();
+            let style = active_settings.monitor_style.clone();
 
-        let cpu = mon.get_cpu_usage() as f64;
-        handles
-            .monitor_cards
-            .cpu
-            .update(cpu, &format!("{cpu:.0}%"), &style);
-
-        let gpu_usage = mon.get_gpu_usage();
-        // TODO(senior-ui): Detect when GPUs go to sleep and slow the polling rate to cut power use.
-        if let Some(gpu) = gpu_usage {
-            handles
+            let cpu = f64::from(data.cpu_usage);
+            handles_weak
                 .monitor_cards
-                .gpu
-                .update(gpu as f64, &format!("{gpu:.0}%"), &style);
-        } else {
-            handles.monitor_cards.gpu.update(0.0, "N/A", &style);
+                .cpu
+                .update(cpu, &format!("{cpu:.0}%"), &style);
+
+            let gpu_usage = data.gpu_usage;
+            if let Some(gpu) = gpu_usage {
+                handles_weak
+                    .monitor_cards
+                    .gpu
+                    .update(f64::from(gpu), &format!("{gpu:.0}%"), &style);
+            } else {
+                handles_weak.monitor_cards.gpu.update(0.0, "N/A", &style);
+            }
+
+            let (used, total) = (data.ram_used, data.ram_total);
+            #[allow(clippy::cast_precision_loss)]
+            let used_gb = used as f64 / 1024.0 / 1024.0 / 1024.0;
+            #[allow(clippy::cast_precision_loss)]
+            let total_gb = total as f64 / 1024.0 / 1024.0 / 1024.0;
+            let ram_pct = if total > 0 {
+                #[allow(clippy::cast_precision_loss)]
+                { used as f64 / total as f64 * 100.0 }
+            } else {
+                0.0
+            };
+            handles_weak.monitor_cards.ram.update(
+                ram_pct,
+                &format!("{used_gb:.1}/{total_gb:.1} GB"),
+                &style,
+            );
+
+            let (rx_raw, tx_raw) = (data.rx_bytes, data.tx_bytes);
+            let (rx_rate, tx_rate) = if let Some((prev_rx, prev_tx)) = last_net {
+                (
+                    rx_raw.saturating_sub(prev_rx),
+                    tx_raw.saturating_sub(prev_tx),
+                )
+            } else {
+                (0, 0)
+            };
+            last_net = Some((rx_raw, tx_raw));
+            #[allow(clippy::cast_precision_loss)]
+            let total_speed = (rx_rate + tx_rate) as f64 / 1024.0;
+            #[allow(clippy::cast_precision_loss)]
+            let rx_kb = rx_rate as f64 / 1024.0;
+            #[allow(clippy::cast_precision_loss)]
+            let tx_kb = tx_rate as f64 / 1024.0;
+            
+            let rx_display = if rx_kb > 1024.0 {
+                format!("{:.1} MB/s", rx_kb / 1024.0)
+            } else {
+                format!("{rx_kb:.0} KB/s")
+            };
+            
+            let tx_display = if tx_kb > 1024.0 {
+                format!("{:.1} MB/s", tx_kb / 1024.0)
+            } else {
+                format!("{tx_kb:.0} KB/s")
+            };
+
+            handles_weak.monitor_cards.net.update(
+                total_speed.min(2000.0),
+                &format!("↓{rx_display} ↑{tx_display}"),
+                &style,
+            );
+
+            let gpu_label = gpu_usage.map(|gpu| format!("GPU {gpu:.0}%"));
+            let net_label = format!("NET {total_speed:.0} KB/s");
+
+            handles_weak.performance_strip.update(
+                &format!("CPU {cpu:.0}%"),
+                gpu_label.as_deref().unwrap_or("GPU —"),
+                &format!("RAM {ram_pct:.0}%"),
+                &net_label,
+            );
         }
-
-        let (used, total) = mon.get_ram_usage();
-        let used_gb = used as f64 / 1024.0 / 1024.0 / 1024.0;
-        let total_gb = total as f64 / 1024.0 / 1024.0 / 1024.0;
-        let ram_pct = if total > 0 {
-            used as f64 / total as f64 * 100.0
-        } else {
-            0.0
-        };
-        handles.monitor_cards.ram.update(
-            ram_pct,
-            &format!("{used_gb:.1}/{total_gb:.1} GB"),
-            &style,
-        );
-
-        let (rx_raw, tx_raw) = mon.get_network_stats();
-        let (rx_rate, tx_rate) = if let Some((prev_rx, prev_tx)) = last_net {
-            (
-                rx_raw.saturating_sub(prev_rx),
-                tx_raw.saturating_sub(prev_tx),
-            )
-        } else {
-            (0, 0)
-        };
-        last_net = Some((rx_raw, tx_raw));
-        let total_speed = (rx_rate + tx_rate) as f64 / 1024.0;
-        let rx_kb = rx_rate as f64 / 1024.0;
-        let tx_kb = tx_rate as f64 / 1024.0;
-        
-        let rx_display = if rx_kb > 1024.0 {
-            format!("{:.1} MB/s", rx_kb / 1024.0)
-        } else {
-            format!("{:.0} KB/s", rx_kb)
-        };
-        
-        let tx_display = if tx_kb > 1024.0 {
-            format!("{:.1} MB/s", tx_kb / 1024.0)
-        } else {
-            format!("{:.0} KB/s", tx_kb)
-        };
-
-        handles.monitor_cards.net.update(
-            total_speed.min(2000.0),
-            &format!("↓{} ↑{}", rx_display, tx_display),
-            &style,
-        );
-
-        let gpu_label = gpu_usage.map(|gpu| format!("GPU {:.0}%", gpu));
-        let net_label = format!("NET {total_speed:.0} KB/s");
-
-        handles.performance_strip.update(
-            &format!("CPU {cpu:.0}%"),
-            gpu_label.as_deref().unwrap_or("GPU —"),
-            &format!("RAM {ram_pct:.0}%"),
-            &net_label,
-        );
-
-        glib::ControlFlow::Continue
     });
 }
 
-fn add_terminal_tab(notebook: &Notebook) {
-    let terminal = create_terminal(None, None);
+fn add_terminal_tab(notebook: &Notebook, shell: &str) {
+    let terminal = create_terminal(shell, None, None);
     let scrolled = gtk4::ScrolledWindow::new();
     scrolled.set_child(Some(&terminal));
     scrolled.set_vexpand(true);
     
     let idx = notebook.n_pages() + 1;
-    let title = format!("T{}", idx);
+    let title = format!("T{idx}");
     let tab_label = build_tab_label(notebook, &scrolled, &title);
     
     notebook.append_page(&scrolled, Some(&tab_label));
@@ -614,7 +637,7 @@ fn build_tab_label(notebook: &Notebook, page: &impl IsA<gtk4::Widget>, title: &s
     // Rename on double click
     let gesture = GestureClick::new();
     gesture.set_button(1);
-    let label_clone = label.clone();
+    let label_clone = label;
     let parent_win = notebook.root().and_then(|r| r.downcast::<gtk4::Window>().ok());
     
     gesture.connect_pressed(move |_gesture, n_press, _, _| {
@@ -694,8 +717,8 @@ fn apply_settings(handles: &UiHandles, settings: &Settings) {
 fn apply_dynamic_styles(provider: &CssProvider, settings: &Settings) {
     let gen_css = |selector: &str, style: &crate::settings::SectionStyle| {
         format!(
-            "{} {{ background-color: {}; opacity: {}; font-size: {}px; border-radius: {}px; }}",
-            selector, style.bg_color, style.opacity, style.font_size, style.border_radius
+            "{} {{ background-color: {}; opacity: {}; font-size: {}px; font-family: '{}'; border-radius: {}px; }}",
+            selector, style.bg_color, style.opacity, style.font_size, style.font_family, style.border_radius
         )
     };
 
@@ -751,8 +774,9 @@ fn build_header(window: &ApplicationWindow, settings: Rc<RefCell<Settings>>) -> 
     glib::timeout_add_seconds_local(1, {
         let label = time_label.clone();
         move || {
-            let now = glib::DateTime::now_local().unwrap();
-            label.set_text(&now.format("%H:%M").unwrap().to_string());
+            #[allow(clippy::expect_used)]
+            let now = glib::DateTime::now_local().unwrap_or_else(|_| glib::DateTime::now_utc().expect("Failed to get UTC time"));
+            label.set_text(now.format("%H:%M").unwrap_or_else(|_| "??:??".into()).as_ref());
             glib::ControlFlow::Continue
         }
     });
@@ -810,7 +834,7 @@ fn build_header(window: &ApplicationWindow, settings: Rc<RefCell<Settings>>) -> 
 
     // Drag to move when unlocked
     let win = window.clone();
-    let settings_drag = settings.clone();
+    let settings_drag = settings;
     let gesture = GestureClick::new();
     gesture.connect_pressed(move |g, _n, x, y| {
         if settings_drag.borrow().lock_in_place {
@@ -823,7 +847,7 @@ fn build_header(window: &ApplicationWindow, settings: Rc<RefCell<Settings>>) -> 
                     if let Some(pointer) = seat.pointer() {
                         toplevel.begin_move(
                             &pointer,
-                            g.current_button() as i32,
+                            g.current_button().try_into().unwrap_or(1),
                             x,
                             y,
                             g.current_event_time(),
@@ -860,6 +884,7 @@ fn create_standalone_window(app: &Application, title: &str, w: i32, h: i32) -> A
     window
 }
 
+#[allow(clippy::too_many_lines)]
 fn build_context_menu(handles: UiHandles) {
     let popover = Popover::builder().has_arrow(true).build();
     popover.set_parent(&handles.main_window);
@@ -913,6 +938,7 @@ fn build_context_menu(handles: UiHandles) {
     gesture.set_button(3);
     let pop_clone = popover.clone();
     gesture.connect_pressed(move |_, _, x, y| {
+        #[allow(clippy::cast_possible_truncation)]
         pop_clone.set_pointing_to(Some(&gdk::Rectangle::new(x as i32, y as i32, 1, 1)));
         pop_clone.popup();
     });
@@ -936,7 +962,7 @@ fn build_context_menu(handles: UiHandles) {
 
     {
         let handles_clone = handles.clone();
-        let pop = popover.clone();
+        let pop = popover;
         settings_btn.connect_clicked(move |_| {
             let settings_rc = handles_clone.settings.clone();
             let handles_apply = handles_clone.clone();
@@ -977,7 +1003,7 @@ fn build_context_menu(handles: UiHandles) {
     }
 
     {
-        let handles_clone = handles.clone();
+        let handles_clone = handles;
         shortcuts_toggle.connect_toggled(move |btn| {
             let mut s = handles_clone.settings.borrow_mut();
             s.show_shortcuts_panel = btn.is_active();

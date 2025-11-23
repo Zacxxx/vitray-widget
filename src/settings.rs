@@ -1,4 +1,3 @@
-use auto_launch;
 use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -24,6 +23,12 @@ pub struct SectionStyle {
     pub bg_color: String, // Hex code, e.g., "#12161e"
     pub font_size: f64,
     pub border_radius: f64,
+    #[serde(default = "default_font")]
+    pub font_family: String,
+}
+
+fn default_font() -> String {
+    "Sans".to_string()
 }
 
 impl Default for SectionStyle {
@@ -33,6 +38,7 @@ impl Default for SectionStyle {
             bg_color: "#12161e".to_string(),
             font_size: 11.0,
             border_radius: 18.0,
+            font_family: "Sans".to_string(),
         }
     }
 }
@@ -58,6 +64,7 @@ impl Default for WidgetLayout {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(default)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct Settings {
     // TODO(senior-ui): Persist window geometry, opacity, and monitor affinity to avoid the widget
     // jumping between workspaces each launch.
@@ -73,6 +80,8 @@ pub struct Settings {
     pub launch_at_start: bool,
     pub lock_in_place: bool,
     pub lock_size: bool,
+    #[serde(default = "default_shell")]
+    pub shell: String,
 
     // New fields for detachable sections
     pub terminal_style: SectionStyle,
@@ -82,6 +91,10 @@ pub struct Settings {
     pub terminal_layout: WidgetLayout,
     pub monitoring_layout: WidgetLayout,
     pub shortcuts_layout: WidgetLayout,
+}
+
+fn default_shell() -> String {
+    std::env::var("SHELL").unwrap_or_else(|_| "/bin/bash".to_string())
 }
 
 impl Default for Settings {
@@ -99,8 +112,12 @@ impl Default for Settings {
             launch_at_start: false,
             lock_in_place: true,
             lock_size: true,
+            shell: default_shell(),
 
-            terminal_style: SectionStyle::default(),
+            terminal_style: SectionStyle {
+                font_family: "Monospace".to_string(),
+                ..SectionStyle::default()
+            },
             monitoring_style: SectionStyle::default(),
             shortcuts_style: SectionStyle::default(),
 

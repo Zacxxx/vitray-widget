@@ -51,11 +51,11 @@ impl Shortcuts {
         }
     }
 
-    pub fn add(&mut self, name: String, command: String) -> Result<(), String> {
+    pub fn add(&mut self, name: &str, command: String) -> Result<(), String> {
         // Enforce unique, slug-safe names
-        let slug = name.trim().replace(" ", "-").to_lowercase();
+        let slug = name.trim().replace(' ', "-").to_lowercase();
         if self.items.iter().any(|s| s.name.to_lowercase() == slug) {
-            return Err(format!("Shortcut '{}' already exists", slug));
+            return Err(format!("Shortcut '{slug}' already exists"));
         }
         
         self.items.push(Shortcut { 
@@ -81,7 +81,7 @@ impl Shortcuts {
     pub fn rename(&mut self, old_name: &str, new_name: String, command: String) -> Result<(), String> {
         // Check if new name conflicts (unless it's the same name)
         if old_name != new_name && self.items.iter().any(|s| s.name == new_name) {
-             return Err(format!("Shortcut '{}' already exists", new_name));
+             return Err(format!("Shortcut '{new_name}' already exists"));
         }
 
         if let Some(existing) = self.items.iter_mut().find(|s| s.name == old_name) {

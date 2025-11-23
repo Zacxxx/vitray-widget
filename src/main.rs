@@ -1,3 +1,7 @@
+//! Vitray widget application entry point.
+//!
+//! This crate provides a desktop widget with system monitoring, terminal, and shortcuts.
+
 use crate::shortcuts::Shortcuts;
 use crate::ui::build_ui;
 use clap::{ArgAction, Parser};
@@ -7,6 +11,7 @@ use std::process::Command;
 
 mod gpu;
 mod monitor;
+mod platform;
 mod settings;
 mod settings_ui;
 mod shortcuts;
@@ -44,6 +49,7 @@ struct Args {
     shortcut_name: Option<String>,
 }
 
+#[allow(clippy::print_stdout)]
 fn main() {
     let args = Args::parse();
 
@@ -52,9 +58,9 @@ fn main() {
             let command = &shortcut_args[0];
             let name = &shortcut_args[1];
             let mut shortcuts = Shortcuts::load();
-            match shortcuts.add(name.clone(), command.clone()) {
-                Ok(_) => println!("Shortcut '{}' added for command '{}'", name, command),
-                Err(e) => eprintln!("Error adding shortcut: {}", e),
+            match shortcuts.add(name, command.clone()) {
+                Ok(()) => println!("Shortcut '{name}' added for command '{command}'"),
+                Err(e) => eprintln!("Error adding shortcut: {e}"),
             }
             return;
         }
@@ -63,9 +69,9 @@ fn main() {
     if let Some(name) = args.remove_shortcut {
         let mut shortcuts = Shortcuts::load();
         if shortcuts.remove_by_name(&name) {
-            println!("Removed shortcut '{}'", name);
+            println!("Removed shortcut '{name}'");
         } else {
-            eprintln!("Shortcut '{}' not found", name);
+            eprintln!("Shortcut '{name}' not found");
         }
         return;
     }
@@ -87,14 +93,13 @@ fn main() {
         let shortcuts = Shortcuts::load();
         if let Some(shortcut) = shortcuts.find(&name) {
             println!("→ Running {} :: {}", shortcut.name, shortcut.command);
-            let _ = Command::new("bash")
+            let _ = Command::new(crate::platform::get_default_shell())
                 .arg("-c")
                 .arg(shortcut.command)
                 .status();
         } else {
             eprintln!(
-                "Shortcut '{}' not found. Use --list-shortcuts to see available entries.",
-                name
+                "Shortcut '{name}' not found. Use --list-shortcuts to see available entries."
             );
         }
         return;

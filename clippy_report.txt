@@ -1,0 +1,437 @@
+    Checking vitray-widget v0.3.0 (/home/moebius/Desktop/Dev/vitray-widget)
+warning: method `toggle` is never used
+  --> src/shortcuts_ui.rs:97:12
+   |
+20 | impl ShortcutsPanel {
+   | ------------------- method in this implementation
+...
+97 |     pub fn toggle(&self) {
+   |            ^^^^^^
+   |
+   = note: `#[warn(dead_code)]` on by default
+
+warning: field `shortcuts_panel` is never read
+   --> src/ui.rs:270:5
+    |
+263 | struct UiHandles {
+    |        --------- field in this struct
+...
+270 |     shortcuts_panel: ShortcutsPanel,
+    |     ^^^^^^^^^^^^^^^
+    |
+    = note: `UiHandles` has a derived impl for the trait `Clone`, but this is intentionally ignored during dead code analysis
+
+warning: more than 3 bools in a struct
+  --> src/settings.rs:67:1
+   |
+67 | / pub struct Settings {
+68 | |     // TODO(senior-ui): Persist window geometry, opacity, and monitor affinity to avoid the widget
+69 | |     // jumping between workspaces each launch.
+70 | |     pub theme: Theme,
+...  |
+92 | |     pub shortcuts_layout: WidgetLayout,
+93 | | }
+   | |_^
+   |
+   = help: consider using a state machine or refactoring bools into two-variant enums
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#struct_excessive_bools
+   = note: `-W clippy::struct-excessive-bools` implied by `-W clippy::pedantic`
+   = help: to override `-W clippy::pedantic` add `#[allow(clippy::struct_excessive_bools)]`
+
+warning: function call inside of `unwrap_or`
+  --> src/settings.rs:96:28
+   |
+96 |     std::env::var("SHELL").unwrap_or("/bin/bash".to_string())
+   |                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `unwrap_or_else(|_| "/bin/bash".to_string())`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#or_fun_call
+   = note: `-W clippy::or-fun-call` implied by `-W clippy::nursery`
+   = help: to override `-W clippy::nursery` add `#[allow(clippy::or_fun_call)]`
+
+warning: this function has too many lines (264/100)
+   --> src/settings_ui.rs:9:1
+    |
+  9 | / pub fn show_settings_window(
+ 10 | |     parent: &impl IsA<Window>,
+ 11 | |     settings: Rc<RefCell<Settings>>,
+ 12 | |     on_save: impl Fn(Settings) + 'static,
+...   |
+358 | |     window.present();
+359 | | }
+    | |_^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#too_many_lines
+    = note: `-W clippy::too-many-lines` implied by `-W clippy::pedantic`
+    = help: to override `-W clippy::pedantic` add `#[allow(clippy::too_many_lines)]`
+
+warning: adding items after statements is confusing, since items exist from the start of the scope
+   --> src/settings_ui.rs:150:1
+    |
+150 | use font_kit::source::SystemSource;
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#items_after_statements
+    = note: `-W clippy::items-after-statements` implied by `-W clippy::pedantic`
+    = help: to override `-W clippy::pedantic` add `#[allow(clippy::items_after_statements)]`
+
+warning: adding items after statements is confusing, since items exist from the start of the scope
+   --> src/settings_ui.rs:152:1
+    |
+152 | / fn get_system_fonts() -> Vec<String> {
+153 | |     let source = SystemSource::new();
+154 | |     let mut families = match source.all_families() {
+155 | |         Ok(f) => f,
+...   |
+160 | |     families
+161 | | }
+    | |_^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#items_after_statements
+
+warning: use Option::map_or_else instead of an if let/else
+   --> src/settings_ui.rs:154:24
+    |
+154 |       let mut families = match source.all_families() {
+    |  ________________________^
+155 | |         Ok(f) => f,
+156 | |         Err(_) => vec!["Sans".to_string(), "Monospace".to_string()],
+157 | |     };
+    | |_____^ help: try: `source.all_families().map_or_else(|_| vec!["Sans".to_string(), "Monospace".to_string()], |f| f)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#option_if_let_else
+    = note: `-W clippy::option-if-let-else` implied by `-W clippy::nursery`
+    = help: to override `-W clippy::nursery` add `#[allow(clippy::option_if_let_else)]`
+
+warning: casting `usize` to `u32` may truncate the value on targets with 64-bit wide pointers
+   --> src/settings_ui.rs:202:29
+    |
+202 |                 active_id = i as u32;
+    |                             ^^^^^^^^
+    |
+    = help: if this is intentional allow the lint with `#[allow(clippy::cast_possible_truncation)]` ...
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_possible_truncation
+    = note: `-W clippy::cast-possible-truncation` implied by `-W clippy::pedantic`
+    = help: to override `-W clippy::pedantic` add `#[allow(clippy::cast_possible_truncation)]`
+help: ... or use `try_from` and handle the error accordingly
+    |
+202 -                 active_id = i as u32;
+202 +                 active_id = u32::try_from(i);
+    |
+
+warning: casting `usize` to `u32` may truncate the value on targets with 64-bit wide pointers
+   --> src/settings_ui.rs:215:40
+    |
+215 |             font_combo.set_active(Some(idx as u32));
+    |                                        ^^^^^^^^^^
+    |
+    = help: if this is intentional allow the lint with `#[allow(clippy::cast_possible_truncation)]` ...
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_possible_truncation
+help: ... or use `try_from` and handle the error accordingly
+    |
+215 -             font_combo.set_active(Some(idx as u32));
+215 +             font_combo.set_active(Some(u32::try_from(idx)));
+    |
+
+warning: these match arms have identical bodies
+   --> src/settings_ui.rs:276:13
+    |
+276 |             0 => Theme::Dark,
+    |             ^^^^^^^^^^^^^^^^
+...
+280 |             _ => Theme::Dark,
+    |             ^^^^^^^^^^^^^^^^ the wildcard arm
+    |
+    = help: if this is unintentional make the arms return different values
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#match_same_arms
+    = note: `-W clippy::match-same-arms` implied by `-W clippy::pedantic`
+    = help: to override `-W clippy::pedantic` add `#[allow(clippy::match_same_arms)]`
+help: otherwise remove the non-wildcard arm
+    |
+276 -             0 => Theme::Dark,
+    |
+
+warning: function call inside of `unwrap_or`
+   --> src/settings_ui.rs:308:75
+    |
+308 |         new_settings.terminal_style.font_family = term_font.active_text().unwrap_or("Monospace".into()).to_string();
+    |                                                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `unwrap_or_else(|| "Monospace".into())`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#or_fun_call
+
+warning: function call inside of `unwrap_or`
+   --> src/settings_ui.rs:314:76
+    |
+314 |         new_settings.monitoring_style.font_family = mon_font.active_text().unwrap_or("Sans".into()).to_string();
+    |                                                                            ^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `unwrap_or_else(|| "Sans".into())`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#or_fun_call
+
+warning: function call inside of `unwrap_or`
+   --> src/settings_ui.rs:320:74
+    |
+320 |         new_settings.shortcuts_style.font_family = sc_font.active_text().unwrap_or("Sans".into()).to_string();
+    |                                                                          ^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `unwrap_or_else(|| "Sans".into())`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#or_fun_call
+
+warning: this argument is passed by value, but not consumed in the function body
+  --> src/shortcuts.rs:54:33
+   |
+54 |     pub fn add(&mut self, name: String, command: String) -> Result<(), String> {
+   |                                 ^^^^^^ help: consider changing the type to: `&str`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#needless_pass_by_value
+   = note: `-W clippy::needless-pass-by-value` implied by `-W clippy::pedantic`
+   = help: to override `-W clippy::pedantic` add `#[allow(clippy::needless_pass_by_value)]`
+
+warning: used `unwrap()` on an `Option` value
+   --> src/shortcuts_ui.rs:142:25
+    |
+142 |         let clipboard = gtk4::gdk::Display::default().unwrap().clipboard();
+    |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: if this value is `None`, it will panic
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unwrap_used
+    = note: requested on the command line with `-W clippy::unwrap-used`
+
+warning: use Option::map_or_else instead of an if let/else
+  --> src/terminal.rs:11:33
+   |
+11 |       let env_vars: Vec<String> = if let Some(vars) = env {
+   |  _________________________________^
+12 | |         vars.iter().map(|(k, v)| format!("{k}={v}")).collect()
+13 | |     } else {
+14 | |         Vec::new()
+15 | |     };
+   | |_____^ help: try: `env.map_or_else(Vec::new, |vars| vars.iter().map(|(k, v)| format!("{k}={v}")).collect())`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#option_if_let_else
+
+warning: casting `usize` to `f64` causes a loss of precision on targets with 64-bit wide pointers (`usize` is 64 bits wide, but `f64`'s mantissa is only 52 bits wide)
+   --> src/ui.rs:147:43
+    |
+147 |             let step = f64::from(width) / (data.len() - 1) as f64;
+    |                                           ^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_precision_loss
+    = note: `-W clippy::cast-precision-loss` implied by `-W clippy::pedantic`
+    = help: to override `-W clippy::pedantic` add `#[allow(clippy::cast_precision_loss)]`
+
+warning: casting `usize` to `f64` causes a loss of precision on targets with 64-bit wide pointers (`usize` is 64 bits wide, but `f64`'s mantissa is only 52 bits wide)
+   --> src/ui.rs:154:25
+    |
+154 |                 let x = idx as f64 * step;
+    |                         ^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_precision_loss
+
+warning: casting `usize` to `f64` causes a loss of precision on targets with 64-bit wide pointers (`usize` is 64 bits wide, but `f64`'s mantissa is only 52 bits wide)
+   --> src/ui.rs:167:25
+    |
+167 |                 let x = idx as f64 * step;
+    |                         ^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_precision_loss
+
+warning: casting `i32` to `usize` may lose the sign of the value
+   --> src/ui.rs:221:46
+    |
+221 |             let max_samples = if width > 0 { width as usize } else { 120 };
+    |                                              ^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_sign_loss
+    = note: `-W clippy::cast-sign-loss` implied by `-W clippy::pedantic`
+    = help: to override `-W clippy::pedantic` add `#[allow(clippy::cast_sign_loss)]`
+
+warning: this function has too many lines (238/100)
+   --> src/ui.rs:282:1
+    |
+282 | / pub fn build_ui(app: &Application) {
+283 | |     let settings = Rc::new(RefCell::new(Settings::load()));
+284 | |     let _shortcuts = Shortcuts::load();
+...   |
+583 | |     });
+584 | | }
+    | |_^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#too_many_lines
+
+warning: casting `u64` to `f64` causes a loss of precision (`u64` is 64 bits wide, but `f64`'s mantissa is only 52 bits wide)
+   --> src/ui.rs:528:27
+    |
+528 |             let used_gb = used as f64 / 1024.0 / 1024.0 / 1024.0;
+    |                           ^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_precision_loss
+
+warning: casting `u64` to `f64` causes a loss of precision (`u64` is 64 bits wide, but `f64`'s mantissa is only 52 bits wide)
+   --> src/ui.rs:529:28
+    |
+529 |             let total_gb = total as f64 / 1024.0 / 1024.0 / 1024.0;
+    |                            ^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_precision_loss
+
+warning: casting `u64` to `f64` causes a loss of precision (`u64` is 64 bits wide, but `f64`'s mantissa is only 52 bits wide)
+   --> src/ui.rs:531:17
+    |
+531 |                 used as f64 / total as f64 * 100.0
+    |                 ^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_precision_loss
+
+warning: casting `u64` to `f64` causes a loss of precision (`u64` is 64 bits wide, but `f64`'s mantissa is only 52 bits wide)
+   --> src/ui.rs:531:31
+    |
+531 |                 used as f64 / total as f64 * 100.0
+    |                               ^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_precision_loss
+
+warning: casting `u64` to `f64` causes a loss of precision (`u64` is 64 bits wide, but `f64`'s mantissa is only 52 bits wide)
+   --> src/ui.rs:551:31
+    |
+551 |             let total_speed = (rx_rate + tx_rate) as f64 / 1024.0;
+    |                               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_precision_loss
+
+warning: casting `u64` to `f64` causes a loss of precision (`u64` is 64 bits wide, but `f64`'s mantissa is only 52 bits wide)
+   --> src/ui.rs:552:25
+    |
+552 |             let rx_kb = rx_rate as f64 / 1024.0;
+    |                         ^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_precision_loss
+
+warning: casting `u64` to `f64` causes a loss of precision (`u64` is 64 bits wide, but `f64`'s mantissa is only 52 bits wide)
+   --> src/ui.rs:553:25
+    |
+553 |             let tx_kb = tx_rate as f64 / 1024.0;
+    |                         ^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_precision_loss
+
+warning: used `unwrap()` on a `Result` value
+   --> src/ui.rs:760:23
+    |
+760 |             let now = glib::DateTime::now_local().unwrap();
+    |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: if this value is an `Err`, it will panic
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unwrap_used
+
+warning: used `unwrap()` on a `Result` value
+   --> src/ui.rs:761:28
+    |
+761 |             label.set_text(now.format("%H:%M").unwrap().as_ref());
+    |                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: if this value is an `Err`, it will panic
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unwrap_used
+
+warning: casting `u32` to `i32` may wrap around the value
+   --> src/ui.rs:832:29
+    |
+832 | ...                   g.current_button() as i32,
+    |                       ^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_possible_wrap
+    = note: `-W clippy::cast-possible-wrap` implied by `-W clippy::pedantic`
+    = help: to override `-W clippy::pedantic` add `#[allow(clippy::cast_possible_wrap)]`
+
+warning: this function has too many lines (110/100)
+   --> src/ui.rs:869:1
+    |
+869 | / fn build_context_menu(handles: UiHandles) {
+870 | |     let popover = Popover::builder().has_arrow(true).build();
+871 | |     popover.set_parent(&handles.main_window);
+...   |
+996 | | }
+    | |_^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#too_many_lines
+
+warning: casting `f64` to `i32` may truncate the value
+   --> src/ui.rs:922:61
+    |
+922 |         pop_clone.set_pointing_to(Some(&gdk::Rectangle::new(x as i32, y as i32, 1, 1)));
+    |                                                             ^^^^^^^^
+    |
+    = help: if this is intentional allow the lint with `#[allow(clippy::cast_possible_truncation)]` ...
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_possible_truncation
+
+warning: casting `f64` to `i32` may truncate the value
+   --> src/ui.rs:922:71
+    |
+922 |         pop_clone.set_pointing_to(Some(&gdk::Rectangle::new(x as i32, y as i32, 1, 1)));
+    |                                                                       ^^^^^^^^
+    |
+    = help: if this is intentional allow the lint with `#[allow(clippy::cast_possible_truncation)]` ...
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_possible_truncation
+
+warning: use of `println!`
+  --> src/main.rs:56:27
+   |
+56 |                 Ok(()) => println!("Shortcut '{name}' added for command '{command}'"),
+   |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#print_stdout
+   = note: requested on the command line with `-W clippy::print-stdout`
+
+warning: use of `println!`
+  --> src/main.rs:66:13
+   |
+66 |             println!("Removed shortcut '{name}'");
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#print_stdout
+
+warning: use of `println!`
+  --> src/main.rs:76:13
+   |
+76 |             println!("No shortcuts defined. Add one with --shortcut \"command\" \"name\".");
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#print_stdout
+
+warning: use of `println!`
+  --> src/main.rs:78:13
+   |
+78 |             println!("Saved shortcuts:");
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#print_stdout
+
+warning: use of `println!`
+  --> src/main.rs:80:17
+   |
+80 |                 println!("- {} :: {}", s.name, s.command);
+   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#print_stdout
+
+warning: use of `println!`
+  --> src/main.rs:89:13
+   |
+89 |             println!("→ Running {} :: {}", shortcut.name, shortcut.command);
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#print_stdout
+
+warning: missing documentation for the crate
+   --> src/main.rs:1:1
+    |
+  1 | / use crate::shortcuts::Shortcuts;
+  2 | | use crate::ui::build_ui;
+  3 | | use clap::{ArgAction, Parser};
+  4 | | use gtk4::prelude::*;
+...   |
+119 | |     app.run();
+120 | | }
+    | |_^
+    |
+    = note: requested on the command line with `-W missing-docs`
+
+warning: `vitray-widget` (bin "vitray-widget") generated 42 warnings
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.69s
