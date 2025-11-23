@@ -4,10 +4,10 @@ version = "0.3.0"
 edition = "2021"
 description = "A glassmorphic desktop widget for system monitoring and terminal access."
 license = "MIT"
+authors = ["Moebius <moebius@example.com>"]
 
 [dependencies]
 gtk4 = "0.10"
-vte4 = "0.9"
 sysinfo = "0.30"
 clap = { version = "4.5", features = ["derive"] }
 serde = { version = "1.0", features = ["derive"] }

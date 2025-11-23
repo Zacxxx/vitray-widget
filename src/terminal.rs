@@ -1,5 +1,7 @@
 use gtk4::prelude::*;
-use gtk4::{gio, glib};
+use gtk4::{glib, Align, Button, Box, Orientation, Label};
+
+#[cfg(target_os = "linux")]
 use vte4::{PtyFlags, Terminal, TerminalExtManual};
 
 pub fn create_terminal(shell: &str, cwd: Option<&str>, env: Option<&[(&str, &str)]>) -> Terminal {
