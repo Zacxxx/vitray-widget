@@ -430,10 +430,7 @@ pub fn build_ui(app: &Application) {
     glib::MainContext::default().spawn_local(async move {
         while let Ok(cmd) = receiver.recv().await {
             let cmd_with_newline = format!("{cmd}\n");
-            #[cfg(target_os = "linux")]
-            if let Ok(term) = terminal.downcast_ref::<vte4::Terminal>() {
-                term.feed_child(cmd_with_newline.as_bytes());
-            }
+            terminal.feed_child(cmd_with_newline.as_bytes());
         }
     });
 
